@@ -1,2 +1,0 @@
-# GerAI
-gerador de provas
