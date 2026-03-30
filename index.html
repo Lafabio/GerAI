@@ -23331,257 +23331,292 @@ async function exportDOCX(){
     const disc      = document.getElementById('selDisc').value     || '';
     const serie     = document.getElementById('selSerie').value    || '';
     const turma     = document.getElementById('selTurma').value    || '';
-    const trim      = document.getElementById('selTrim').value     || '';
+    const trimVal   = document.getElementById('selTrim').value     || '';
     const instrText = document.getElementById('instrucoes').value  || '';
     const dataStr   = document.getElementById('calBtn').textContent.trim();
-    const dataFmt   = dataStr === 'Selecionar data…' ? '___/___/____' : dataStr;
+    const dataFmt   = dataStr === 'Selecionar data\u2026' ? '___/___/____' : dataStr;
     const letras    = tipoProva === 'em' ? ['A','B','C','D','E'] : ['A','B','C','D'];
 
-    const bdr     = { style: BorderStyle.SINGLE, size: 4, color: '333333' };
-    const bdrAll  = { top: bdr, bottom: bdr, left: bdr, right: bdr };
-    const bdrN    = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
-    const noBdr   = { top: bdrN, bottom: bdrN, left: bdrN, right: bdrN };
+    // ── BORDAS ──
+    const bdr    = { style: BorderStyle.SINGLE, size: 4, color: '333333' };
+    const bdrAll = { top: bdr, bottom: bdr, left: bdr, right: bdr };
+    const bdrN   = { style: BorderStyle.NONE,   size: 0, color: 'FFFFFF' };
+    const noBdr  = { top: bdrN, bottom: bdrN, left: bdrN, right: bdrN };
 
-    function cell(children, opts) {
-      opts = opts || {};
-      return new TableCell({
-        borders:       opts.borders !== undefined ? opts.borders : bdrAll,
-        width:         opts.w ? { size: opts.w, type: WidthType.DXA } : undefined,
-        columnSpan:    opts.span,
-        rowSpan:       opts.rowSpan,
-        verticalAlign: opts.vAlign !== undefined ? opts.vAlign : VerticalAlign.CENTER,
-        shading:       opts.shade ? { fill: opts.shade, type: ShadingType.CLEAR } : undefined,
-        margins:       { top: 60, bottom: 60, left: 80, right: 80 },
-        children:      Array.isArray(children) ? children : [children]
-      });
-    }
-
-    function txt(text, opts) {
-      opts = opts || {};
+    // ── HELPERS ──
+    function txt(text, o) {
+      o = o || {};
       return new TextRun({
         text:    String(text || ''),
         font:    'Arial',
-        size:    opts.size  !== undefined ? opts.size  : 20,
-        bold:    opts.bold  !== undefined ? opts.bold  : false,
-        italics: opts.it    !== undefined ? opts.it    : false,
-        color:   opts.color !== undefined ? opts.color : '000000'
+        size:    o.size  != null ? o.size  : 20,
+        bold:    o.bold  != null ? o.bold  : false,
+        italics: o.it    != null ? o.it    : false,
+        color:   o.color != null ? o.color : '000000',
       });
     }
 
-    function para(runs, opts) {
-      opts = opts || {};
-      var runsArr = Array.isArray(runs) ? runs : [runs];
+    function para(runs, o) {
+      o = o || {};
       return new Paragraph({
-        alignment: opts.align !== undefined ? opts.align : AlignmentType.LEFT,
-        spacing:   { before: opts.before || 0, after: opts.after || 0 },
-        indent:    opts.indent ? { left: opts.indent } : undefined,
-        children:  runsArr
+        alignment: o.align != null ? o.align : AlignmentType.LEFT,
+        spacing:   { before: o.before || 0, after: o.after || 0 },
+        indent:    o.indent ? { left: o.indent } : undefined,
+        children:  Array.isArray(runs) ? runs : [runs],
       });
     }
 
-    function hLine() {
-      return new Paragraph({
-        spacing: { before: 80, after: 0 },
-        border: { bottom: { style: BorderStyle.SINGLE, size: 2, color: 'E0E0E0' } },
-        children: [txt('')]
+    function cell(children, o) {
+      o = o || {};
+      return new TableCell({
+        borders:       o.borders != null ? o.borders : bdrAll,
+        width:         o.w ? { size: o.w, type: WidthType.DXA } : undefined,
+        columnSpan:    o.span,
+        rowSpan:       o.rows,
+        verticalAlign: o.vAlign != null ? o.vAlign : VerticalAlign.CENTER,
+        shading:       o.shade  ? { fill: o.shade, type: ShadingType.CLEAR } : undefined,
+        margins:       { top: o.mt||60, bottom: o.mb||60, left: o.ml||80, right: o.mr||80 },
+        children:      Array.isArray(children) ? children : [children],
       });
     }
 
-    function blankLine() {
-      return new Paragraph({
-        spacing: { before: 48, after: 0 },
-        border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: '999999' } },
-        children: [txt('')]
-      });
-    }
+    // ─────────────────────────────────────────────
+    // LAYOUT: tabela única com cabeçalho + gabarito
+    //
+    // Página A4 com margens de 1134 DXA (2cm) cada lado
+    // Largura útil = 11906 - 2*1134 = 9638 DXA
+    //
+    // Gabarito: col Nº(480) + cols letra(350 cada) + col marcação(350)
+    //   4 letras: 480 + 4*350 + 350 = 480 + 1750 = 2230
+    //   5 letras: 480 + 5*350 + 350 = 480 + 2100 = 2580
+    // Cabeçalho: 9638 - gabW - gap(0) = restante
+    // ─────────────────────────────────────────────
 
-    // ── CABEÇALHO ──
-    var headerTable = new Table({
-      width: { size: 9638, type: WidthType.DXA },
-      columnWidths: [9638],
-      rows: [
-        new TableRow({ children: [
-          cell(para([txt(escola, { bold: true, size: 26 })], { align: AlignmentType.CENTER }))
-        ]}),
-        new TableRow({ children: [
-          cell(para([txt(cidade, { size: 19 })], { align: AlignmentType.CENTER }))
-        ]}),
-        new TableRow({ children: [
-          cell(para([txt(titulo, { bold: true, size: 23 })], { align: AlignmentType.CENTER }))
-        ]}),
-        new TableRow({ children: [
-          cell(para([
-            txt('Professor(a): ', { bold: true, size: 19 }),
-            txt(prof || '____________________________', { size: 19 }),
-            txt('     Disciplina: ', { bold: true, size: 19 }),
-            txt(disc || '________________', { size: 19 })
-          ]))
-        ]}),
-        new TableRow({ children: [
-          cell(para([
-            txt('Aluno(a): ________________________________  ', { size: 19 }),
-            txt('Série: ', { bold: true, size: 19 }), txt(serie + '  ', { size: 19 }),
-            txt('Turma: ', { bold: true, size: 19 }), txt((turma||'___') + '  ', { size: 19 }),
-            txt('Trim.: ', { bold: true, size: 19 }), txt(trim + '  ', { size: 19 }),
-            txt('Data: ', { bold: true, size: 19 }), txt(dataFmt, { size: 19 })
-          ]))
-        ]}),
-        new TableRow({ children: [
-          cell(para([txt('Assinatura do responsável: _________________________   Data: ___/___/___', { size: 19 })]))
-        ]}),
-        new TableRow({ children: [
-          cell(para([txt(instrText, { size: 19, it: true })]))
-        ]})
-      ]
+    const colNW   = 480;
+    const colLW   = 350;                            // largura de cada letra + marcação
+    const gabW    = colNW + (letras.length + 1) * colLW;  // total gabarito
+    const cabW    = 9638 - gabW;                    // total cabeçalho
+
+    // Larguras das colunas da tabela principal:
+    // col 0 = cabeçalho (span todas as linhas do cab)
+    // cols 1..N = gabarito (Nº + letras + marcação)
+    const colWidths = [cabW, colNW].concat(letras.map(function(){ return colLW; })).concat([colLW]);
+    // total cols = 1 + 1 + letras.length + 1 = letras.length + 3
+    const totalCols = 2 + letras.length + 1;
+
+    // ── LINHAS DO GABARITO ──
+    var gabRows = [];
+    // Linha de cabeçalho do gabarito
+    var gabHdrCells = [
+      cell(para([txt('Nº', {bold:true, size:16})], {align: AlignmentType.CENTER}),
+           {w: colNW, shade: 'E8E8E8'}),
+    ];
+    letras.forEach(function(l){
+      gabHdrCells.push(cell(para([txt(l, {bold:true, size:16})], {align: AlignmentType.CENTER}),
+                            {w: colLW, shade: 'E8E8E8'}));
     });
+    gabHdrCells.push(cell(para([txt('\u2713', {bold:true, size:14})], {align: AlignmentType.CENTER}),
+                          {w: colLW, shade: 'E8E8E8'}));
+    gabRows.push(gabHdrCells);
 
-    // ── GABARITO ──
-    var gabColW = Math.floor(1500 / (letras.length + 1));
-    var gabColWidths = [500].concat(letras.map(function(){ return gabColW; })).concat([gabColW]);
-
-    var gabHeaderCells = [
-      cell(para([txt('Nº', { bold: true, size: 16 })], { align: AlignmentType.CENTER }), { w: 500, shade: 'E8E8E8' })
-    ].concat(letras.map(function(l){
-      return cell(para([txt(l, { bold: true, size: 16 })], { align: AlignmentType.CENTER }), { w: gabColW, shade: 'E8E8E8' });
-    })).concat([
-      cell(para([txt('✓', { bold: true, size: 14 })], { align: AlignmentType.CENTER }), { w: gabColW, shade: 'E8E8E8' })
-    ]);
-
-    var gabRows = [new TableRow({ children: gabHeaderCells })];
-
-    questoes.forEach(function(q, i) {
+    questoes.forEach(function(q, i){
       var shade = i % 2 === 0 ? 'F5F5F5' : 'FFFFFF';
-      var correta = q.tipo === 'multipla' ? q.alternativas.find(function(a){ return a.correta; }) : null;
-
+      var correta = q.tipo === 'multipla'
+        ? q.alternativas.find(function(a){ return a.correta; })
+        : null;
+      var row = [
+        cell(para([txt(String(i+1), {bold:true, size:16})], {align: AlignmentType.CENTER}),
+             {w: colNW, shade: shade}),
+      ];
       if (q.tipo === 'discursiva') {
-        gabRows.push(new TableRow({ children: [
-          cell(para([txt(String(i+1), { bold: true, size: 16 })], { align: AlignmentType.CENTER }), { w: 500, shade: shade }),
-          cell(para([txt('Discursiva', { size: 13, it: true })], { align: AlignmentType.CENTER }), { span: letras.length + 1, shade: shade })
-        ]}));
+        row.push(cell(para([txt('Discursiva', {size:13, it:true})], {align: AlignmentType.CENTER}),
+                      {span: letras.length + 1, shade: shade}));
       } else if (q.tipo === 'somatoria') {
-        var soma = q.somatoria.filter(function(s){ return s.ok; }).reduce(function(a,s){ return a+s.v; }, 0);
-        gabRows.push(new TableRow({ children: [
-          cell(para([txt(String(i+1), { bold: true, size: 16 })], { align: AlignmentType.CENTER }), { w: 500, shade: shade }),
-          cell(para([txt('= ' + (soma||'—'), { bold: true, size: 14 })], { align: AlignmentType.CENTER }), { span: letras.length + 1, shade: shade })
-        ]}));
+        var soma = q.somatoria.filter(function(s){ return s.ok; })
+                              .reduce(function(a,s){ return a+s.v; }, 0);
+        row.push(cell(para([txt('= '+(soma||'\u2014'), {bold:true, size:14})], {align: AlignmentType.CENTER}),
+                      {span: letras.length + 1, shade: shade}));
       } else {
-        var altCells = [
-          cell(para([txt(String(i+1), { bold: true, size: 16 })], { align: AlignmentType.CENTER }), { w: 500, shade: shade })
-        ];
-        letras.forEach(function(l) {
+        letras.forEach(function(l){
           var isOk = correta && correta.letra === l;
-          altCells.push(cell(
-            para([txt(l, { bold: isOk, size: 16, color: isOk ? '166534' : '000000' })], { align: AlignmentType.CENTER }),
-            { w: gabColW, shade: shade }
+          row.push(cell(
+            para([txt(l, {bold: isOk, size:16, color: isOk ? '166534' : '000000'})],
+                 {align: AlignmentType.CENTER}),
+            {w: colLW, shade: shade}
           ));
         });
-        altCells.push(cell(para([txt('')]), { w: gabColW, shade: shade }));
-        gabRows.push(new TableRow({ children: altCells }));
+        row.push(cell(para([txt('')]), {w: colLW, shade: shade}));
       }
+      gabRows.push(row);
     });
 
+    // ── MONTAR TABELA PRINCIPAL ──
+    // Linhas do cabeçalho: escola, cidade, título, prof+disc, aluno, assinatura, instruções
+    // Cada linha de cab ocupa a coluna 0 (span=1) e as cols do gabarito são preenchidas
+    // pelas linhas de gabRows correspondentes.
+    // 
+    // Usamos DUAS tabelas separadas dentro de uma tabela-wrapper sem bordas,
+    // mas agora o wrapper usa larguras exatas para não vazar.
+
+    // Cabeçalho: tabela interna sem largura excessiva
+    var cabRows = [
+      new TableRow({ children:[
+        cell(para([txt(escola, {bold:true, size:24})], {align: AlignmentType.CENTER}), {w: cabW})
+      ]}),
+      new TableRow({ children:[
+        cell(para([txt(cidade, {size:18})], {align: AlignmentType.CENTER}), {w: cabW})
+      ]}),
+      new TableRow({ children:[
+        cell(para([txt(titulo, {bold:true, size:22})], {align: AlignmentType.CENTER}), {w: cabW})
+      ]}),
+      new TableRow({ children:[
+        cell(para([
+          txt('Professor(a): ', {bold:true, size:19}),
+          txt(prof || '________________________', {size:19}),
+          txt('    Disciplina: ', {bold:true, size:19}),
+          txt(disc || '____________', {size:19}),
+        ]), {w: cabW})
+      ]}),
+      new TableRow({ children:[
+        cell(para([
+          txt('Aluno(a): _______________________________  ', {size:19}),
+          txt('Série: ', {bold:true, size:19}), txt(serie+'  ', {size:19}),
+          txt('Turma: ', {bold:true, size:19}), txt((turma||'___')+'  ', {size:19}),
+          txt('Trim.: ', {bold:true, size:19}), txt(trimVal+'  ', {size:19}),
+          txt('Data: ', {bold:true, size:19}), txt(dataFmt, {size:19}),
+        ]), {w: cabW})
+      ]}),
+      new TableRow({ children:[
+        cell(para([
+          txt('Assinatura do responsável: _______________________   Data: ___/___/___', {size:19})
+        ]), {w: cabW})
+      ]}),
+      new TableRow({ children:[
+        cell(para([txt(instrText, {size:18, it:true})]), {w: cabW})
+      ]}),
+    ];
+
+    var cabTable = new Table({
+      width:        { size: cabW, type: WidthType.DXA },
+      columnWidths: [cabW],
+      rows:         cabRows,
+    });
+
+    // Gabarito: tabela interna
+    var gabColWidths = [colNW].concat(letras.map(function(){ return colLW; })).concat([colLW]);
+    var gabTableRows = gabRows.map(function(cells){ return new TableRow({ children: cells }); });
     var gabTable = new Table({
-      width: { size: 2200, type: WidthType.DXA },
+      width:        { size: gabW, type: WidthType.DXA },
       columnWidths: gabColWidths,
-      rows: gabRows
+      rows:         gabTableRows,
     });
 
-    // ── WRAPPER HEADER + GABARITO ──
+    // Wrapper: linha única, duas células sem bordas
     var wrapTable = new Table({
-      width: { size: 9638, type: WidthType.DXA },
-      columnWidths: [7338, 2300],
+      width:        { size: 9638, type: WidthType.DXA },
+      columnWidths: [cabW, gabW],
       rows: [new TableRow({ children: [
         new TableCell({
-          borders: noBdr,
-          width: { size: 7338, type: WidthType.DXA },
+          borders:       noBdr,
+          width:         { size: cabW, type: WidthType.DXA },
           verticalAlign: VerticalAlign.TOP,
-          margins: { top: 0, bottom: 0, left: 0, right: 100 },
-          children: [headerTable]
+          margins:       { top: 0, bottom: 0, left: 0, right: 60 },
+          children:      [cabTable],
         }),
         new TableCell({
-          borders: noBdr,
-          width: { size: 2300, type: WidthType.DXA },
+          borders:       noBdr,
+          width:         { size: gabW, type: WidthType.DXA },
           verticalAlign: VerticalAlign.TOP,
-          children: [gabTable]
-        })
+          margins:       { top: 0, bottom: 0, left: 0, right: 0 },
+          children:      [gabTable],
+        }),
       ]})],
     });
 
     // ── QUESTÕES ──
-    var qChildren = [
-      new Paragraph({ spacing: { before: 180, after: 0 }, children: [txt('')] })
-    ];
+    var qChildren = [new Paragraph({ spacing: { before: 200, after: 0 }, children: [txt('')] })];
 
-    questoes.forEach(function(q, i) {
+    questoes.forEach(function(q, i){
       var num = i + 1;
       var pts = q.pts.toFixed(1).replace('.', ',');
 
       if (q.distrator && q.distrator.trim()) {
-        var lines = q.distrator.split('\n');
-        lines.forEach(function(line) {
-          qChildren.push(para([txt(line, { size: 19, it: true, color: '444444' })], { before: 40, indent: 360 }));
+        q.distrator.split('\n').forEach(function(line){
+          qChildren.push(para([txt(line, {size:19, it:true, color:'444444'})],
+                               {before:40, indent:360}));
         });
-        qChildren.push(new Paragraph({ spacing: { before: 40 }, children: [txt('')] }));
+        qChildren.push(new Paragraph({spacing:{before:40}, children:[txt('')]}));
       }
 
       if (q.consigna && q.consigna.trim()) {
-        qChildren.push(para([txt(q.consigna, { size: 19, it: true })], { before: 60 }));
+        qChildren.push(para([txt(q.consigna, {size:19, it:true})], {before:60}));
       }
 
       qChildren.push(para([
-        txt('Questão ' + num + ' (' + pts + ' pts) – ', { bold: true, size: 21 }),
-        txt(q.enunciado || '[sem enunciado]', { size: 21 })
-      ], { before: 140, after: 60 }));
+        txt('Questão '+num+' ('+pts+' pts) \u2013 ', {bold:true, size:21}),
+        txt(q.enunciado || '[sem enunciado]', {size:21}),
+      ], {before:140, after:60}));
 
       if (q.tipo === 'multipla') {
-        q.alternativas.forEach(function(a) {
+        q.alternativas.forEach(function(a){
           if (!a.texto.trim()) return;
           qChildren.push(para([
-            txt(a.letra + ') ', { bold: true, size: 20 }),
-            txt(a.texto, { size: 20 })
-          ], { before: 40, indent: 360 }));
+            txt(a.letra+') ', {bold:true, size:20}),
+            txt(a.texto, {size:20}),
+          ], {before:40, indent:360}));
         });
       } else if (q.tipo === 'somatoria') {
-        qChildren.push(para([txt('Some os valores das afirmativas VERDADEIRAS.', { size: 17, it: true, color: '555555' })], { before: 40 }));
-        q.somatoria.forEach(function(s) {
+        qChildren.push(para([txt('Some os valores das afirmativas VERDADEIRAS.',
+                                  {size:17, it:true, color:'555555'})], {before:40}));
+        q.somatoria.forEach(function(s){
           if (!s.txt.trim()) return;
           qChildren.push(para([
-            txt('(' + s.v + ') ', { bold: true, size: 20, color: '92400e' }),
-            txt(s.txt, { size: 20 })
-          ], { before: 40, indent: 360 }));
+            txt('('+s.v+') ', {bold:true, size:20, color:'92400e'}),
+            txt(s.txt, {size:20}),
+          ], {before:40, indent:360}));
         });
       } else {
         for (var l = 0; l < (q.linhas || 4); l++) {
-          qChildren.push(blankLine());
+          qChildren.push(new Paragraph({
+            spacing: {before:48, after:0},
+            border:  {bottom:{style:BorderStyle.SINGLE, size:4, color:'999999'}},
+            children:[txt('')],
+          }));
         }
       }
 
-      qChildren.push(hLine());
+      qChildren.push(new Paragraph({
+        spacing: {before:80, after:0},
+        border:  {bottom:{style:BorderStyle.SINGLE, size:2, color:'E0E0E0'}},
+        children:[txt('')],
+      }));
     });
 
-    // ── MONTAR DOCUMENTO ──
+    // ── DOCUMENTO ──
     var doc = new Document({
       sections: [{
         properties: {
           page: {
-            size: { width: 11906, height: 16838 },
-            margin: { top: 1134, right: 1134, bottom: 1134, left: 1134 }
-          }
+            size:   { width: 11906, height: 16838 },
+            margin: { top: 1134, right: 1134, bottom: 1134, left: 1134 },
+          },
         },
-        children: [wrapTable].concat(qChildren)
-      }]
+        children: [wrapTable].concat(qChildren),
+      }],
     });
 
-    // toBase64String é o método mais compatível com browser (file://, GitHub Pages, etc.)
+    // ── DOWNLOAD ──
     var base64 = await Packer.toBase64String(doc);
     var binary = atob(base64);
-    var bytes = new Uint8Array(binary.length);
+    var bytes  = new Uint8Array(binary.length);
     for (var b = 0; b < binary.length; b++) bytes[b] = binary.charCodeAt(b);
-    var blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    var blob = new Blob([bytes], {
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
-    a.download = (escola.replace(/\s+/g, '_') || 'prova') + '.docx';
+    a.download = (escola.replace(/\s+/g,'_') || 'prova') + '.docx';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -23591,8 +23626,8 @@ async function exportDOCX(){
     console.error('Erro ao gerar DOCX:', err);
     alert('Erro ao gerar DOCX:\n' + err.message);
   } finally {
-    var btnDocx2 = document.getElementById('btnDocx');
-    if(btnDocx2){ btnDocx2.disabled=false; btnDocx2.textContent='📝 Exportar DOCX'; }
+    var btn2 = document.getElementById('btnDocx');
+    if(btn2){ btn2.disabled=false; btn2.textContent='\uD83D\uDCDD Exportar DOCX'; }
   }
 }
 
