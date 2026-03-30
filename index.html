@@ -23572,7 +23572,12 @@ async function exportDOCX(){
       }]
     });
 
-    var blob = await Packer.toBlob(doc);
+    // toBase64String é o método mais compatível com browser (file://, GitHub Pages, etc.)
+    var base64 = await Packer.toBase64String(doc);
+    var binary = atob(base64);
+    var bytes = new Uint8Array(binary.length);
+    for (var b = 0; b < binary.length; b++) bytes[b] = binary.charCodeAt(b);
+    var blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
