@@ -23572,8 +23572,7 @@ async function exportDOCX(){
       }]
     });
 
-    var buffer = await Packer.toBuffer(doc);
-    var blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    var blob = await Packer.toBlob(doc);
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
