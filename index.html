@@ -10,7 +10,7 @@
 <script>
 /* ── DOCX LIB (docx.js bundled inline – omitted here, loaded from CDN below) ── */
 </script>
-<script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.js"></script>
 <style>
 :root{--bg:#eeebe6;--sf:#faf9f7;--card:#fff;--br:#d4cfc6;--brs:#a5a09a;--tx:#1a1916;--mu:#7a7570;--ac:#1d4ed8;--acbg:#eff6ff;--dn:#b91c1c;--ok:#166534;--wn:#92400e;--wnbg:#fef9c3;--r:8px;--sh:0 1px 3px rgba(0,0,0,.08)}
 *{margin:0;padding:0;box-sizing:border-box}
@@ -797,11 +797,11 @@ async function exportDOCX(){
   const btnDocx=document.getElementById('btnDocx');
   if(btnDocx){btnDocx.disabled=true;btnDocx.textContent='⏳ Gerando DOCX…';}
   try{
+    const docxLib = window.docx || docx;
     const {
       Document,Packer,Paragraph,TextRun,Table,TableRow,TableCell,
       AlignmentType,BorderStyle,WidthType,ShadingType,VerticalAlign
-    }=docx;
-
+    }=docxLib;
     const escola=document.getElementById('nomeEscola').value||'';
     const cidade=document.getElementById('cidadeEscola').value||'';
     const titulo=document.getElementById('tituloAval').value||'AVALIAÇÃO';
