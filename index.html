@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 :root{--bg:#eeebe6;--sf:#faf9f7;--card:#fff;--br:#d4cfc6;--brs:#a5a09a;--tx:#1a1916;--mu:#7a7570;--ac:#1d4ed8;--acbg:#eff6ff;--dn:#b91c1c;--ok:#166534;--wn:#92400e;--wnbg:#fef9c3;--r:8px;--sh:0 1px 3px rgba(0,0,0,.08)}
 *{margin:0;padding:0;box-sizing:border-box}
@@ -118,11 +119,7 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tx)
 .modal-hd h2{font-size:13px;font-weight:700}
 .modal-hd button{background:var(--bg);border:1px solid var(--br);font-size:11px;font-weight:600;padding:4px 10px;border-radius:5px;cursor:pointer;font-family:'IBM Plex Sans',sans-serif}
 .modal-bd{padding:18px;max-height:78vh;overflow-y:auto;font-family:Arial,sans-serif;font-size:11pt}
-.print-area{background:white;padding:10mm;max-width:210mm;margin:0 auto;box-sizing:border-box}
-@media print{
-  .no-print{display:none}
-  .print-area{margin:0;padding:10mm;width:100%}
-}
+@media print{.no-print{display:none}}
 </style>
 </head>
 <body>
@@ -139,7 +136,6 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tx)
 
 <div class="app">
 <aside class="sb no-print">
-
   <div class="sb-s">
     <div class="slbl">Escola</div>
     <div class="fl"><label>Nome da Escola</label><input id="nomeEscola" placeholder="Ex: Colégio Municipal..." oninput="autoSave()"></div>
@@ -151,7 +147,6 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tx)
       </div>
     </div>
   </div>
-
   <div class="sb-s">
     <div class="slbl">Cadastro de Professores</div>
     <div class="cad-list" id="profList"></div>
@@ -160,7 +155,6 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tx)
       <button class="cad-btn" onclick="addProf()">+ Add</button>
     </div>
   </div>
-
   <div class="sb-s">
     <div class="slbl">Cadastro de Disciplinas</div>
     <div class="cad-list" id="discList"></div>
@@ -169,7 +163,6 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tx)
       <button class="cad-btn" onclick="addDisc()">+ Add</button>
     </div>
   </div>
-
   <div class="sb-s">
     <div class="slbl">Dados da Avaliação</div>
     <div class="fl"><label>Título</label><input id="tituloAval" placeholder="Ex: AVALIAÇÃO MENSAL 1" oninput="autoSave()"></div>
@@ -212,7 +205,6 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tx)
       </div>
     </div>
   </div>
-
   <div class="sb-s">
     <div class="slbl">Tipo de Prova</div>
     <div class="tipo-tg" id="tipoTg">
@@ -220,23 +212,19 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tx)
       <button onclick="setTipoProva('em',this)">Médio (A–E)</button>
     </div>
   </div>
-
   <div class="sb-s">
     <div class="slbl">Pontuação padrão por questão</div>
     <div class="fl"><input id="ptsDefault" type="number" value="1" min="0.1" step="0.1"></div>
     <div style="font-size:10.5px;color:var(--mu)" id="ptsSummary"></div>
   </div>
-
   <div class="sb-s">
     <div class="slbl">Instruções no cabeçalho</div>
     <div class="fl"><textarea id="instrucoes" rows="3" oninput="autoSave()">Sua avaliação será corrigida conforme as opções marcadas. Não rasure! Pinte a alternativa com caneta preta ou azul.</textarea></div>
   </div>
-
   <div class="sb-s">
     <button onclick="addQ()" style="width:100%;background:var(--ac);color:#fff;border:none;padding:8px;border-radius:6px;font-family:'IBM Plex Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:4px">+ Adicionar Questão</button>
     <button onclick="resetAll()" style="width:100%;background:var(--bg);color:var(--mu);border:1px solid var(--br);padding:7px;border-radius:6px;font-family:'IBM Plex Sans',sans-serif;font-size:11px;cursor:pointer">🗑 Limpar Tudo</button>
   </div>
-
 </aside>
 
 <main class="editor">
@@ -261,125 +249,34 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tx)
 let tipoProva='efaf', questoes=[], qId=0, logoB64=null;
 let professors=[], disciplinas=[], selectedDate=null;
 let calYear=new Date().getFullYear(), calMonth=new Date().getMonth();
-// Cache da lib docx carregada dinamicamente
-let _docxLib=null;
-
 const LEM=['A','B','C','D','E'], LEF=['A','B','C','D'];
 const SOMA_SEQ=[1,2,4,8,16,32,64];
 
-// ── CARREGA DOCX DINAMICAMENTE ──
-async function loadDocxLib(){
-  if(_docxLib) return _docxLib;
-  return new Promise((resolve,reject)=>{
-    // Remove script antigo se existir
-    const old=document.getElementById('_docxScript');
-    if(old) old.remove();
-    const s=document.createElement('script');
-    s.id='_docxScript';
-    // Tenta jsdelivr primeiro (mais confiável para UMD)
-    s.src='https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.js';
-    s.onload=()=>{
-      // A lib registra como window.docx
-      const lib=window.docx;
-      if(lib && lib.Document){
-        _docxLib=lib;
-        resolve(lib);
-      } else {
-        reject(new Error('Biblioteca docx carregada mas não encontrada em window.docx'));
-      }
-    };
-    s.onerror=()=>{
-      // Fallback: unpkg
-      const s2=document.createElement('script');
-      s2.src='https://unpkg.com/docx@8.5.0/build/index.js';
-      s2.onload=()=>{
-        const lib=window.docx;
-        if(lib && lib.Document){
-          _docxLib=lib;
-          resolve(lib);
-        } else {
-          reject(new Error('Não foi possível carregar a biblioteca docx. Verifique sua conexão.'));
-        }
-      };
-      s2.onerror=()=>reject(new Error('Falha ao carregar a biblioteca docx dos dois CDNs.'));
-      document.head.appendChild(s2);
-    };
-    document.head.appendChild(s);
-  });
-}
-
-// ── INIT ──
 window.addEventListener('DOMContentLoaded',()=>{
-  const disc=['Português','Matemática','Ciências','História','Geografia','Inglês','Arte','Educação Física','Biologia','Física','Química','Filosofia','Sociologia','Redação'];
-  disc.forEach(d=>addDiscItem(d));
+  ['Português','Matemática','Ciências','História','Geografia','Inglês','Arte','Educação Física','Biologia','Física','Química','Filosofia','Sociologia','Redação'].forEach(d=>addDiscItem(d));
   for(let i=0;i<10;i++) addQ(i<2?'discursiva':'multipla');
   renderCal(); updatePts();
-  document.addEventListener('click',e=>{
-    if(!e.target.closest('.cal-wrap')) document.getElementById('calPop').classList.remove('open');
-  });
-  // Pré-carrega a lib docx em background para não travar no clique
-  loadDocxLib().catch(()=>{});
+  document.addEventListener('click',e=>{ if(!e.target.closest('.cal-wrap')) document.getElementById('calPop').classList.remove('open'); });
 });
 
-// ── LOGO ──
 function loadLogo(inp){
   if(!inp.files[0])return;
   const r=new FileReader();
-  r.onload=e=>{
-    logoB64=e.target.result;
-    const img=document.getElementById('logoImg');
-    img.src=logoB64; img.style.display='block';
-    document.getElementById('logoHint').style.display='none';
-  };
+  r.onload=e=>{ logoB64=e.target.result; const img=document.getElementById('logoImg'); img.src=logoB64; img.style.display='block'; document.getElementById('logoHint').style.display='none'; };
   r.readAsDataURL(inp.files[0]);
 }
 
-// ── PROFESSORES ──
-function addProf(){
-  const inp=document.getElementById('profNovo');
-  const v=inp.value.trim(); if(!v)return;
-  if(professors.includes(v)){inp.value='';return;}
-  professors.push(v); inp.value='';
-  renderProfList(); renderProfSelect();
-}
+function addProf(){ const inp=document.getElementById('profNovo'); const v=inp.value.trim(); if(!v||professors.includes(v))return; professors.push(v); inp.value=''; renderProfList(); renderProfSelect(); }
 function delProf(i){ professors.splice(i,1); renderProfList(); renderProfSelect(); }
-function renderProfList(){
-  document.getElementById('profList').innerHTML=professors.map((p,i)=>
-    `<div class="cad-item"><span>${p}</span><button class="cad-del" onclick="delProf(${i})">✕</button></div>`
-  ).join('');
-}
-function renderProfSelect(){
-  const sel=document.getElementById('selProf');
-  const cur=sel.value;
-  sel.innerHTML='<option value="">— Selecione —</option>'+professors.map(p=>`<option value="${p}">${p}</option>`).join('');
-  if(professors.includes(cur)) sel.value=cur;
-}
+function renderProfList(){ document.getElementById('profList').innerHTML=professors.map((p,i)=>`<div class="cad-item"><span>${p}</span><button class="cad-del" onclick="delProf(${i})">✕</button></div>`).join(''); }
+function renderProfSelect(){ const sel=document.getElementById('selProf'); const cur=sel.value; sel.innerHTML='<option value="">— Selecione —</option>'+professors.map(p=>`<option value="${p}">${p}</option>`).join(''); if(professors.includes(cur)) sel.value=cur; }
 
-// ── DISCIPLINAS ──
-function addDisc(){
-  const inp=document.getElementById('discNova');
-  const v=inp.value.trim(); if(!v)return;
-  if(disciplinas.includes(v)){inp.value='';return;}
-  addDiscItem(v); inp.value='';
-}
-function addDiscItem(v){
-  if(disciplinas.includes(v))return;
-  disciplinas.push(v); renderDiscList(); renderDiscSelect();
-}
+function addDisc(){ const inp=document.getElementById('discNova'); const v=inp.value.trim(); if(!v||disciplinas.includes(v))return; addDiscItem(v); inp.value=''; }
+function addDiscItem(v){ if(disciplinas.includes(v))return; disciplinas.push(v); renderDiscList(); renderDiscSelect(); }
 function delDisc(i){ disciplinas.splice(i,1); renderDiscList(); renderDiscSelect(); }
-function renderDiscList(){
-  document.getElementById('discList').innerHTML=disciplinas.map((d,i)=>
-    `<div class="cad-item"><span>${d}</span><button class="cad-del" onclick="delDisc(${i})">✕</button></div>`
-  ).join('');
-}
-function renderDiscSelect(){
-  const sel=document.getElementById('selDisc');
-  const cur=sel.value;
-  sel.innerHTML='<option value="">— Selecione —</option>'+disciplinas.map(d=>`<option value="${d}">${d}</option>`).join('');
-  if(disciplinas.includes(cur)) sel.value=cur;
-}
+function renderDiscList(){ document.getElementById('discList').innerHTML=disciplinas.map((d,i)=>`<div class="cad-item"><span>${d}</span><button class="cad-del" onclick="delDisc(${i})">✕</button></div>`).join(''); }
+function renderDiscSelect(){ const sel=document.getElementById('selDisc'); const cur=sel.value; sel.innerHTML='<option value="">— Selecione —</option>'+disciplinas.map(d=>`<option value="${d}">${d}</option>`).join(''); if(disciplinas.includes(cur)) sel.value=cur; }
 
-// ── CALENDÁRIO ──
 const MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const DIAS=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 function toggleCal(){ document.getElementById('calPop').classList.toggle('open'); }
@@ -388,436 +285,149 @@ function renderCal(){
   document.getElementById('calTitle').textContent=`${MESES[calMonth]} ${calYear}`;
   const grid=document.getElementById('calGrid');
   grid.innerHTML=DIAS.map(d=>`<div class="cal-lbl">${d}</div>`).join('');
-  const first=new Date(calYear,calMonth,1).getDay();
-  const days=new Date(calYear,calMonth+1,0).getDate();
-  const today=new Date();
-  const prevDays=new Date(calYear,calMonth,0).getDate();
-  for(let i=first-1;i>=0;i--){
-    grid.innerHTML+=`<div class="cal-d other-m">${prevDays-i}</div>`;
-  }
+  const first=new Date(calYear,calMonth,1).getDay(), days=new Date(calYear,calMonth+1,0).getDate();
+  const today=new Date(), prevDays=new Date(calYear,calMonth,0).getDate();
+  for(let i=first-1;i>=0;i--) grid.innerHTML+=`<div class="cal-d other-m">${prevDays-i}</div>`;
   for(let d=1;d<=days;d++){
     const isSel=selectedDate&&selectedDate.y===calYear&&selectedDate.m===calMonth&&selectedDate.d===d;
     const isToday=today.getFullYear()===calYear&&today.getMonth()===calMonth&&today.getDate()===d;
-    let cls='cal-d';
-    if(isSel) cls+=' sel';
-    else if(isToday) cls+=' today';
-    grid.innerHTML+=`<div class="${cls}" onclick="pickDate(${d})">${d}</div>`;
+    grid.innerHTML+=`<div class="cal-d${isSel?' sel':isToday?' today':''}" onclick="pickDate(${d})">${d}</div>`;
   }
 }
 function pickDate(d){
   selectedDate={y:calYear,m:calMonth,d};
-  const dd=String(d).padStart(2,'0');
-  const mm=String(calMonth+1).padStart(2,'0');
-  document.getElementById('calBtn').textContent=`${dd}/${mm}/${calYear}`;
-  document.getElementById('calPop').classList.remove('open');
-  renderCal();
+  document.getElementById('calBtn').textContent=`${String(d).padStart(2,'0')}/${String(calMonth+1).padStart(2,'0')}/${calYear}`;
+  document.getElementById('calPop').classList.remove('open'); renderCal();
 }
 
-// ── TIPO DE PROVA ──
-function setTipoProva(t,btn){
-  tipoProva=t;
-  document.querySelectorAll('#tipoTg button').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  renderAll();
-}
+function setTipoProva(t,btn){ tipoProva=t; document.querySelectorAll('#tipoTg button').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderAll(); }
 
-// ── QUESTÕES ──
 function addQ(tipo){
   tipo=tipo||'multipla';
   const letras=tipoProva==='em'?[...LEM]:[...LEF];
-  const q={
-    id:++qId, tipo,
-    distrator:'', imagem:null, consigna:'', enunciado:'',
-    pts:parseFloat(document.getElementById('ptsDefault').value)||1,
-    alternativas:letras.map((l,i)=>({letra:l,texto:'',correta:i===0})),
-    somatoria:[
-      {v:1,txt:'',ok:false},
-      {v:2,txt:'',ok:false},
-      {v:4,txt:'',ok:false},
-      {v:8,txt:'',ok:false}
-    ],
-    linhas:4
-  };
-  questoes.push(q);
-  renderQ(q);
-  updatePts();
+  questoes.push({id:++qId,tipo,distrator:'',imagem:null,consigna:'',enunciado:'',pts:parseFloat(document.getElementById('ptsDefault').value)||1,alternativas:letras.map((l,i)=>({letra:l,texto:'',correta:i===0})),somatoria:[{v:1,txt:'',ok:false},{v:2,txt:'',ok:false},{v:4,txt:'',ok:false},{v:8,txt:'',ok:false}],linhas:4});
+  renderQ(questoes[questoes.length-1]); updatePts();
 }
+function delQ(id){ if(questoes.length<=1){alert('A prova precisa ter ao menos 1 questão.');return;} if(!confirm('Remover esta questão?'))return; questoes=questoes.filter(q=>q.id!==id); renderAll(); updatePts(); }
+function moveQ(id,dir){ const i=questoes.findIndex(q=>q.id===id),ni=i+dir; if(ni<0||ni>=questoes.length)return; [questoes[i],questoes[ni]]=[questoes[ni],questoes[i]]; renderAll(); }
+function dupQ(id){ const q=questoes.find(q=>q.id===id); if(!q)return; const nq=JSON.parse(JSON.stringify(q)); nq.id=++qId; questoes.splice(questoes.findIndex(q=>q.id===id)+1,0,nq); renderAll(); updatePts(); }
+function setTipoQ(id,tipo){ const q=questoes.find(q=>q.id===id); if(!q)return; q.tipo=tipo; if(tipo==='multipla'){const letras=tipoProva==='em'?[...LEM]:[...LEF]; q.alternativas=letras.map((l,i)=>({letra:l,texto:q.alternativas[i]?q.alternativas[i].texto:'',correta:i===0}));} renderAll(); }
+function addSomatItem(id){ const q=questoes.find(q=>q.id===id); if(!q)return; const used=q.somatoria.map(s=>s.v),next=SOMA_SEQ.find(v=>!used.includes(v)); if(!next){alert('Todos os valores já foram adicionados.');return;} q.somatoria.push({v:next,txt:'',ok:false}); q.somatoria.sort((a,b)=>SOMA_SEQ.indexOf(a.v)-SOMA_SEQ.indexOf(b.v)); renderAll(); }
+function remSomatItem(id){ const q=questoes.find(q=>q.id===id); if(!q||q.somatoria.length<=1){alert('Mínimo de 1 item.');return;} q.somatoria.pop(); renderAll(); }
 
-function delQ(id){
-  if(questoes.length<=1){alert('A prova precisa ter ao menos 1 questão.');return;}
-  if(!confirm('Remover esta questão?'))return;
-  questoes=questoes.filter(q=>q.id!==id);
-  renderAll(); updatePts();
-}
-
-function moveQ(id,dir){
-  const i=questoes.findIndex(q=>q.id===id);
-  const ni=i+dir;
-  if(ni<0||ni>=questoes.length)return;
-  [questoes[i],questoes[ni]]=[questoes[ni],questoes[i]];
-  renderAll();
-}
-
-function dupQ(id){
-  const q=questoes.find(q=>q.id===id);
-  if(!q)return;
-  const nq=JSON.parse(JSON.stringify(q));
-  nq.id=++qId;
-  const i=questoes.findIndex(q=>q.id===id);
-  questoes.splice(i+1,0,nq);
-  renderAll(); updatePts();
-}
-
-function setTipoQ(id,tipo){
-  const q=questoes.find(q=>q.id===id);
-  if(!q)return;
-  q.tipo=tipo;
-  if(tipo==='multipla'){
-    const letras=tipoProva==='em'?[...LEM]:[...LEF];
-    q.alternativas=letras.map((l,i)=>({letra:l,texto:q.alternativas[i]?q.alternativas[i].texto:'',correta:i===0}));
-  }
-  renderAll();
-}
-
-function addSomatItem(id){
-  const q=questoes.find(q=>q.id===id);
-  if(!q)return;
-  const used=q.somatoria.map(s=>s.v);
-  const next=SOMA_SEQ.find(v=>!used.includes(v));
-  if(!next){alert('Todos os valores da sequência (01→64) já foram adicionados.');return;}
-  q.somatoria.push({v:next,txt:'',ok:false});
-  q.somatoria.sort((a,b)=>SOMA_SEQ.indexOf(a.v)-SOMA_SEQ.indexOf(b.v));
-  renderAll();
-}
-
-function remSomatItem(id){
-  const q=questoes.find(q=>q.id===id);
-  if(!q)return;
-  if(q.somatoria.length<=1){alert('A somatória precisa de pelo menos 1 item.');return;}
-  q.somatoria.pop();
-  renderAll();
-}
-
-function renderAll(){
-  document.getElementById('qContainer').innerHTML='';
-  questoes.forEach(q=>renderQ(q));
-}
-
+function renderAll(){ document.getElementById('qContainer').innerHTML=''; questoes.forEach(q=>renderQ(q)); }
 function renderQ(q){
-  const cont=document.getElementById('qContainer');
-  const num=questoes.indexOf(q)+1;
-  const numStr=String(num).padStart(2,'0');
+  const cont=document.getElementById('qContainer'),num=questoes.indexOf(q)+1,numStr=String(num).padStart(2,'0');
   const letras=tipoProva==='em'?[...LEM]:[...LEF];
-  if(q.tipo==='multipla'&&q.alternativas.length!==letras.length){
-    q.alternativas=letras.map((l,i)=>({letra:l,texto:q.alternativas[i]?q.alternativas[i].texto:'',correta:i===0}));
-  }
-  const div=document.createElement('div');
-  div.className='qw'; div.id='qw-'+q.id;
-
-  const imgHTML=q.imagem
-    ?`<img src="${q.imagem}"><br><button class="img-rm" onclick="event.stopPropagation();rmImg(${q.id})">✕ Remover imagem</button>`
-    :'<p>📷 Clique para adicionar imagem (opcional)</p>';
-
+  if(q.tipo==='multipla'&&q.alternativas.length!==letras.length) q.alternativas=letras.map((l,i)=>({letra:l,texto:q.alternativas[i]?q.alternativas[i].texto:'',correta:i===0}));
+  const div=document.createElement('div'); div.className='qw'; div.id='qw-'+q.id;
+  const imgHTML=q.imagem?`<img src="${q.imagem}"><br><button class="img-rm" onclick="event.stopPropagation();rmImg(${q.id})">✕ Remover imagem</button>`:'<p>📷 Clique para adicionar imagem (opcional)</p>';
   let tipoArea='';
   if(q.tipo==='multipla'){
-    tipoArea=`<div class="qf"><label>Alternativas <span style="color:var(--mu);font-weight:400;font-size:9px;">(marque o gabarito)</span></label>
-    <div class="alts">${q.alternativas.map((a,i)=>`
-      <div class="alt-row">
-        <span class="alt-l">${a.letra})</span>
-        <input class="alt-in" type="text" value="${esc(a.texto)}" placeholder="Alternativa ${a.letra}…" oninput="setAlt(${q.id},${i},this.value)">
-        <input type="radio" class="alt-radio" name="gab-${q.id}" ${a.correta?'checked':''} onchange="setAltOk(${q.id},${i})">
-        <span class="alt-rl">Gabarito</span>
-      </div>`).join('')}
-    </div></div>`;
+    tipoArea=`<div class="qf"><label>Alternativas <span style="color:var(--mu);font-weight:400;font-size:9px;">(marque o gabarito)</span></label><div class="alts">${q.alternativas.map((a,i)=>`<div class="alt-row"><span class="alt-l">${a.letra})</span><input class="alt-in" type="text" value="${esc(a.texto)}" placeholder="Alternativa ${a.letra}…" oninput="setAlt(${q.id},${i},this.value)"><input type="radio" class="alt-radio" name="gab-${q.id}" ${a.correta?'checked':''} onchange="setAltOk(${q.id},${i})"><span class="alt-rl">Gabarito</span></div>`).join('')}</div></div>`;
   } else if(q.tipo==='somatoria'){
     const soma=q.somatoria.filter(s=>s.ok).reduce((a,s)=>a+s.v,0);
-    const canAdd=q.somatoria.length < SOMA_SEQ.length;
-    const canRem=q.somatoria.length > 1;
-    tipoArea=`<div class="qf"><label>Itens da Somatória <span style="color:var(--mu);font-weight:400;font-size:9px;">(marque os corretos)</span></label>
-    <div class="somat">${q.somatoria.map((s,i)=>`
-      <div class="somat-r">
-        <span class="somat-v">(${String(s.v).padStart(2,'0')})</span>
-        <input class="somat-in" type="text" value="${esc(s.txt)}" placeholder="Afirmativa ${String(s.v).padStart(2,'0')}…" oninput="setSomat(${q.id},${i},'txt',this.value)">
-        <input type="checkbox" class="somat-cb" ${s.ok?'checked':''} onchange="setSomat(${q.id},${i},'ok',this.checked)">
-        <span class="alt-rl">✓</span>
-      </div>`).join('')}
-    </div>
-    <div class="somat-hint" id="somat-hint-${q.id}">Gabarito da somatória: <strong>${soma||'—'}</strong></div>
-    <div class="somat-btns">
-      <button class="somat-add" onclick="addSomatItem(${q.id})" ${canAdd?'':'disabled'}>+ Adicionar item</button>
-      <button class="somat-rem" onclick="remSomatItem(${q.id})" ${canRem?'':'disabled'}>− Remover último</button>
-    </div>
-    </div>`;
+    tipoArea=`<div class="qf"><label>Itens da Somatória</label><div class="somat">${q.somatoria.map((s,i)=>`<div class="somat-r"><span class="somat-v">(${String(s.v).padStart(2,'0')})</span><input class="somat-in" type="text" value="${esc(s.txt)}" placeholder="Afirmativa…" oninput="setSomat(${q.id},${i},'txt',this.value)"><input type="checkbox" class="somat-cb" ${s.ok?'checked':''} onchange="setSomat(${q.id},${i},'ok',this.checked)"><span class="alt-rl">✓</span></div>`).join('')}</div><div class="somat-hint" id="somat-hint-${q.id}">Gabarito: <strong>${soma||'—'}</strong></div><div class="somat-btns"><button class="somat-add" onclick="addSomatItem(${q.id})" ${q.somatoria.length<SOMA_SEQ.length?'':'disabled'}>+ Item</button><button class="somat-rem" onclick="remSomatItem(${q.id})" ${q.somatoria.length>1?'':'disabled'}>− Remover</button></div></div>`;
   } else {
-    tipoArea=`<div class="qf"><label>Linhas para resposta discursiva</label>
-    <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
-      <input type="number" value="${q.linhas}" min="1" max="20" style="width:60px;font-family:'IBM Plex Sans',sans-serif;font-size:12px;border:1px solid var(--br);border-radius:5px;padding:4px 7px;" oninput="setF(${q.id},'linhas',parseInt(this.value)||4)">
-      <span style="font-size:11px;color:var(--mu);">linhas em branco (espaçamento 1,5)</span>
-    </div></div>`;
+    tipoArea=`<div class="qf"><label>Linhas para resposta discursiva</label><div style="display:flex;align-items:center;gap:8px;margin-top:4px;"><input type="number" value="${q.linhas}" min="1" max="20" style="width:60px;font-family:'IBM Plex Sans',sans-serif;font-size:12px;border:1px solid var(--br);border-radius:5px;padding:4px 7px;" oninput="setF(${q.id},'linhas',parseInt(this.value)||4)"><span style="font-size:11px;color:var(--mu);">linhas em branco</span></div></div>`;
   }
-
   div.innerHTML=`
-  <div class="qtop">
-    <span class="qnum">QUESTÃO ${numStr}</span>
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span style="font-size:11px;color:var(--mu);">
-        <input type="number" class="pts-in" value="${q.pts}" min="0.1" step="0.1" onchange="setF(${q.id},'pts',parseFloat(this.value)||1);updatePts()"> pts
-      </span>
-      <div class="qctrl">
-        <button class="qb mv" onclick="moveQ(${q.id},-1)" title="Mover para cima">↑</button>
-        <button class="qb mv" onclick="moveQ(${q.id},1)" title="Mover para baixo">↓</button>
-        <button class="qb" onclick="dupQ(${q.id})">⧉ Dup</button>
-        <button class="qb del" onclick="delQ(${q.id})">✕ Remover</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="qtipo">
-    <span>Tipo:</span>
-    <button class="qtbtn ${q.tipo==='multipla'?'active':''}" onclick="setTipoQ(${q.id},'multipla')">Múltipla Escolha</button>
-    <button class="qtbtn ${q.tipo==='somatoria'?'active':''}" onclick="setTipoQ(${q.id},'somatoria')">Somatória</button>
-    <button class="qtbtn ${q.tipo==='discursiva'?'active':''}" onclick="setTipoQ(${q.id},'discursiva')">Discursiva</button>
-  </div>
-
-  <div class="qf">
-    <label>① Texto Distrator (opcional)</label>
-    <textarea placeholder="Cole aqui o texto base, trecho, tabela ou poema que serve de suporte para a questão…" oninput="setF(${q.id},'distrator',this.value)">${q.distrator||''}</textarea>
-  </div>
-
-  <div class="qf">
-    <label>② Imagem (opcional)</label>
-    <div class="imgdrop" onclick="document.getElementById('qi-${q.id}').click()">
-      <input type="file" id="qi-${q.id}" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;" onchange="setImg(${q.id},this)">
-      ${imgHTML}
-    </div>
-  </div>
-
-  <div class="qf">
-    <label>③ Consigna / instrução (opcional)</label>
-    <input type="text" value="${esc(q.consigna||'')}" placeholder="Ex: Assinale a alternativa correta." oninput="setF(${q.id},'consigna',this.value)">
-  </div>
-
-  <div class="qf">
-    <label>④ Enunciado da Questão *</label>
-    <textarea rows="3" placeholder="Digite o enunciado completo da questão…" oninput="setF(${q.id},'enunciado',this.value)">${q.enunciado||''}</textarea>
-  </div>
-
+  <div class="qtop"><span class="qnum">QUESTÃO ${numStr}</span><div style="display:flex;align-items:center;gap:8px;"><span style="font-size:11px;color:var(--mu);"><input type="number" class="pts-in" value="${q.pts}" min="0.1" step="0.1" onchange="setF(${q.id},'pts',parseFloat(this.value)||1);updatePts()"> pts</span><div class="qctrl"><button class="qb mv" onclick="moveQ(${q.id},-1)">↑</button><button class="qb mv" onclick="moveQ(${q.id},1)">↓</button><button class="qb" onclick="dupQ(${q.id})">⧉ Dup</button><button class="qb del" onclick="delQ(${q.id})">✕ Remover</button></div></div></div>
+  <div class="qtipo"><span>Tipo:</span><button class="qtbtn ${q.tipo==='multipla'?'active':''}" onclick="setTipoQ(${q.id},'multipla')">Múltipla Escolha</button><button class="qtbtn ${q.tipo==='somatoria'?'active':''}" onclick="setTipoQ(${q.id},'somatoria')">Somatória</button><button class="qtbtn ${q.tipo==='discursiva'?'active':''}" onclick="setTipoQ(${q.id},'discursiva')">Discursiva</button></div>
+  <div class="qf"><label>① Texto Distrator (opcional)</label><textarea placeholder="Cole aqui o texto base…" oninput="setF(${q.id},'distrator',this.value)">${q.distrator||''}</textarea></div>
+  <div class="qf"><label>② Imagem (opcional)</label><div class="imgdrop" onclick="document.getElementById('qi-${q.id}').click()"><input type="file" id="qi-${q.id}" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;" onchange="setImg(${q.id},this)">${imgHTML}</div></div>
+  <div class="qf"><label>③ Consigna / instrução (opcional)</label><input type="text" value="${esc(q.consigna||'')}" placeholder="Ex: Assinale a alternativa correta." oninput="setF(${q.id},'consigna',this.value)"></div>
+  <div class="qf"><label>④ Enunciado da Questão *</label><textarea rows="3" placeholder="Digite o enunciado completo da questão…" oninput="setF(${q.id},'enunciado',this.value)">${q.enunciado||''}</textarea></div>
   ${tipoArea}`;
-
   cont.appendChild(div);
 }
 
-// ── HELPERS ──
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function xmlEsc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;')}
 function setF(id,f,v){ const q=questoes.find(q=>q.id===id); if(q) q[f]=v; }
 function setAlt(id,i,v){ const q=questoes.find(q=>q.id===id); if(q) q.alternativas[i].texto=v; }
 function setAltOk(id,i){ const q=questoes.find(q=>q.id===id); if(!q)return; q.alternativas.forEach((a,j)=>a.correta=j===i); }
-function setSomat(id,i,f,v){
-  const q=questoes.find(q=>q.id===id); if(!q)return;
-  q.somatoria[i][f]=v;
-  const soma=q.somatoria.filter(s=>s.ok).reduce((a,s)=>a+s.v,0);
-  const hint=document.getElementById(`somat-hint-${id}`);
-  if(hint) hint.innerHTML=`Gabarito da somatória: <strong>${soma||'—'}</strong>`;
-}
-function setImg(id,inp){
-  if(!inp.files[0])return;
-  const r=new FileReader();
-  r.onload=e=>{ const q=questoes.find(q=>q.id===id); if(q){ q.imagem=e.target.result; renderAll(); }};
-  r.readAsDataURL(inp.files[0]);
-}
-function rmImg(id){ const q=questoes.find(q=>q.id===id); if(q){ q.imagem=null; renderAll(); }}
+function setSomat(id,i,f,v){ const q=questoes.find(q=>q.id===id); if(!q)return; q.somatoria[i][f]=v; const soma=q.somatoria.filter(s=>s.ok).reduce((a,s)=>a+s.v,0); const hint=document.getElementById(`somat-hint-${id}`); if(hint) hint.innerHTML=`Gabarito: <strong>${soma||'—'}</strong>`; }
+function setImg(id,inp){ if(!inp.files[0])return; const r=new FileReader(); r.onload=e=>{ const q=questoes.find(q=>q.id===id); if(q){q.imagem=e.target.result;renderAll();}}; r.readAsDataURL(inp.files[0]); }
+function rmImg(id){ const q=questoes.find(q=>q.id===id); if(q){q.imagem=null;renderAll();} }
 function updatePts(){
   const tot=questoes.reduce((a,q)=>a+(parseFloat(q.pts)||0),0);
   document.getElementById('totalPts').textContent=tot.toFixed(1).replace('.',',');
-  const warn=document.getElementById('ptsWarn');
-  warn.style.display=Math.abs(tot-10)>0.01?'':'none';
+  document.getElementById('ptsWarn').style.display=Math.abs(tot-10)>0.01?'':'none';
   document.getElementById('ptsSummary').textContent=`${questoes.length} questão(ões) · Total ${tot.toFixed(1)} pts`;
 }
-function resetAll(){
-  if(!confirm('Apagar tudo e recomeçar?'))return;
-  questoes=[]; qId=0;
-  document.getElementById('qContainer').innerHTML='';
-  for(let i=0;i<10;i++) addQ(i<2?'discursiva':'multipla');
-  updatePts();
-}
-
-// ── PRÉ-VISUALIZAÇÃO ──
-function openPreview(){ document.getElementById('modalBd').innerHTML=buildHTML(true); document.getElementById('modalPreview').classList.remove('hidden'); }
+function resetAll(){ if(!confirm('Apagar tudo e recomeçar?'))return; questoes=[];qId=0; document.getElementById('qContainer').innerHTML=''; for(let i=0;i<10;i++) addQ(i<2?'discursiva':'multipla'); updatePts(); }
+function autoSave(){ try{sessionStorage.setItem('gp_e',document.getElementById('nomeEscola').value);}catch(e){} }
+function openPreview(){ document.getElementById('modalBd').innerHTML=buildHTML(); document.getElementById('modalPreview').classList.remove('hidden'); }
 function closePreview(){ document.getElementById('modalPreview').classList.add('hidden'); }
 
-// ── BUILD HTML ──
-function buildHTML(isPreview=false){
-  const escola=document.getElementById('nomeEscola').value;
-  const cidade=document.getElementById('cidadeEscola').value;
-  const titulo=document.getElementById('tituloAval').value;
-  const prof=document.getElementById('selProf').value;
-  const disc=document.getElementById('selDisc').value;
-  const serie=document.getElementById('selSerie').value;
-  const turma=document.getElementById('selTurma').value;
-  const trim=document.getElementById('selTrim').value;
+function buildHTML(){
+  const escola=document.getElementById('nomeEscola').value,cidade=document.getElementById('cidadeEscola').value;
+  const titulo=document.getElementById('tituloAval').value,prof=document.getElementById('selProf').value;
+  const disc=document.getElementById('selDisc').value,serie=document.getElementById('selSerie').value;
+  const turma=document.getElementById('selTurma').value,trim=document.getElementById('selTrim').value;
   const instrucoes=document.getElementById('instrucoes').value;
   const dataStr=document.getElementById('calBtn').textContent.trim();
   const letras=tipoProva==='em'?[...LEM]:[...LEF];
-
-  let gabHtml=`<table style="width:152px;border-collapse:collapse;border:1.5px solid #333;font-family:Arial,sans-serif;font-size:8.5pt;float:right;margin-left:8px;">
-  <tr style="background:#e8e8e8;"><th style="border:1px solid #333;padding:3px 5px;text-align:center;">Nº</th><th style="border:1px solid #333;padding:3px 5px;text-align:center;" colspan="${letras.length+1}">Gabarito</th></tr>`;
+  let gabHtml=`<table style="width:152px;border-collapse:collapse;border:1.5px solid #333;font-family:Arial,sans-serif;font-size:8.5pt;float:right;margin-left:8px;"><tr style="background:#e8e8e8;"><th style="border:1px solid #333;padding:3px 5px;text-align:center;">Nº</th><th style="border:1px solid #333;padding:3px 5px;text-align:center;" colspan="${letras.length+1}">Gabarito</th></tr>`;
   questoes.forEach((q,i)=>{
     const correta=q.tipo==='multipla'?q.alternativas.find(a=>a.correta):null;
-    const rowBg=i%2===0?'#f9f9f9':'#ffffff';
-    gabHtml+=`<tr style="background:${rowBg}"><td style="border:1px solid #333;padding:2px 5px;text-align:center;font-weight:bold;">${i+1}</td>`;
-    if(q.tipo==='discursiva'){
-      gabHtml+=`<td style="border:1px solid #333;padding:2px 4px;text-align:center;font-size:7.5pt;" colspan="${letras.length+1}">Discursiva</td>`;
-    } else if(q.tipo==='somatoria'){
-      const soma=q.somatoria.filter(s=>s.ok).reduce((a,s)=>a+s.v,0);
-      gabHtml+=`<td style="border:1px solid #333;padding:2px 4px;text-align:center;font-size:7.5pt;" colspan="${letras.length+1}">= ${soma||'—'}</td>`;
-    } else {
-      letras.forEach((l,idx)=>{
-        const isOk=correta&&correta.letra===l;
-        const colBg=idx%2===0?'#f5f5f5':'#ffffff';
-        gabHtml+=`<td style="border:1px solid #333;padding:2px 4px;text-align:center;background:${colBg};${isOk?'font-weight:bold;':''}">${l}</td>`;
-      });
-      gabHtml+=`<td style="border:1px solid #333;padding:2px 3px;width:14px;background:#f0f0f0;"></td>`;
-    }
+    gabHtml+=`<tr style="background:${i%2===0?'#f9f9f9':'#fff'}"><td style="border:1px solid #333;padding:2px 5px;text-align:center;font-weight:bold;">${i+1}</td>`;
+    if(q.tipo==='discursiva') gabHtml+=`<td style="border:1px solid #333;padding:2px 4px;text-align:center;font-size:7.5pt;" colspan="${letras.length+1}">Discursiva</td>`;
+    else if(q.tipo==='somatoria'){const soma=q.somatoria.filter(s=>s.ok).reduce((a,s)=>a+s.v,0); gabHtml+=`<td style="border:1px solid #333;padding:2px 4px;text-align:center;font-size:7.5pt;" colspan="${letras.length+1}">= ${soma||'—'}</td>`;}
+    else{letras.forEach((l,idx)=>{const isOk=correta&&correta.letra===l; gabHtml+=`<td style="border:1px solid #333;padding:2px 4px;text-align:center;background:${idx%2===0?'#f5f5f5':'#fff'};${isOk?'font-weight:bold;':''}">${l}</td>`;});gabHtml+=`<td style="border:1px solid #333;padding:2px 3px;width:14px;background:#f0f0f0;"></td>`;}
     gabHtml+=`</tr>`;
   });
   gabHtml+=`</table>`;
-
-  const logoHtml=logoB64
-    ?`<img src="${logoB64}" style="max-width:85px;max-height:65px;object-fit:contain;">`
-    :`<div style="width:85px;height:65px;border:1px dashed #ccc;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#aaa;text-align:center;">Logo</div>`;
-
-  const wrap=`<div style="overflow:hidden;font-family:Arial,sans-serif;margin-bottom:14px;">
-    ${gabHtml}
-    <table style="border-collapse:collapse;border:1.5px solid #333;font-family:Arial,sans-serif;font-size:9pt;width:calc(100% - 160px);">
-       <tr><td rowspan="5" style="border:1px solid #333;width:95px;text-align:center;vertical-align:middle;padding:5px;">${logoHtml}</td>
-        <td colspan="3" style="border:1px solid #333;text-align:center;vertical-align:middle;padding:4px 6px;">
-          <div style="font-size:12.5pt;font-weight:bold;">${escola}</div>
-          <div style="font-size:9.5pt;margin-top:1px;">${cidade}</div>
-          <div style="font-size:11.5pt;font-weight:bold;margin-top:2px;">${titulo}</div>
-         </td>
-        <td rowspan="5" style="border:1px solid #333;width:20px;text-align:center;vertical-align:middle;font-size:9pt;font-weight:bold;letter-spacing:.12em;writing-mode:vertical-rl;padding:4px;">N&nbsp;O&nbsp;T&nbsp;A</td>
-        <td rowspan="5" style="border:1px solid #333;width:72px;"></td>
-       </tr>
-       <tr><td colspan="2" style="border:1px solid #333;padding:3px 6px;font-size:8.5pt;">Professor(a): <u>${prof||'______________________________'}</u></td>
-        <td style="border:1px solid #333;padding:3px 6px;font-size:8.5pt;">Disciplina: <u>${disc||'_______________'}</u></td>
-       </tr>
-       <tr><td colspan="3" style="border:1px solid #333;padding:3px 6px;font-size:8.5pt;">Aluno(a): _____________________________ &nbsp; Série: <u>${serie}</u> &nbsp; Turma: <u>${turma||'___'}</u> &nbsp; Trimestre: <u>${trim}</u> &nbsp; Data: <u>${dataStr==='Selecionar data…'?'___/___/____':dataStr}</u></td></tr>
-       <tr><td colspan="3" style="border:1px solid #333;padding:3px 6px;font-size:8.5pt;">Assinatura do responsável: __________________________ &nbsp;&nbsp; Data: ___/___/___</td></tr>
-       <tr><td colspan="3" style="border:1px solid #333;padding:4px 6px;font-size:8.5pt;">${instrucoes}</td></tr>
-     </table>
-  </div>`;
-
+  const logoHtml=logoB64?`<img src="${logoB64}" style="max-width:85px;max-height:65px;object-fit:contain;">`:`<div style="width:85px;height:65px;border:1px dashed #ccc;display:flex;align-items:center;justify-content:center;font-size:8px;color:#aaa;">Logo</div>`;
+  const wrap=`<div style="overflow:hidden;font-family:Arial,sans-serif;margin-bottom:14px;">${gabHtml}<table style="border-collapse:collapse;border:1.5px solid #333;font-family:Arial,sans-serif;font-size:9pt;width:calc(100% - 160px);"><tr><td rowspan="5" style="border:1px solid #333;width:95px;text-align:center;vertical-align:middle;padding:5px;">${logoHtml}</td><td colspan="3" style="border:1px solid #333;text-align:center;vertical-align:middle;padding:4px 6px;"><div style="font-size:12.5pt;font-weight:bold;">${escola}</div><div style="font-size:9.5pt;">${cidade}</div><div style="font-size:11.5pt;font-weight:bold;">${titulo}</div></td><td rowspan="5" style="border:1px solid #333;width:20px;text-align:center;vertical-align:middle;font-size:9pt;font-weight:bold;writing-mode:vertical-rl;padding:4px;">N&nbsp;O&nbsp;T&nbsp;A</td><td rowspan="5" style="border:1px solid #333;width:72px;"></td></tr><tr><td colspan="2" style="border:1px solid #333;padding:3px 6px;font-size:8.5pt;">Professor(a): <u>${prof||'______________________________'}</u></td><td style="border:1px solid #333;padding:3px 6px;font-size:8.5pt;">Disciplina: <u>${disc||'_______________'}</u></td></tr><tr><td colspan="3" style="border:1px solid #333;padding:3px 6px;font-size:8.5pt;">Aluno(a): _____________________________ Série: <u>${serie}</u> Turma: <u>${turma||'___'}</u> Trimestre: <u>${trim}</u> Data: <u>${dataStr==='Selecionar data…'?'___/___/____':dataStr}</u></td></tr><tr><td colspan="3" style="border:1px solid #333;padding:3px 6px;font-size:8.5pt;">Assinatura do responsável: __________________________ Data: ___/___/___</td></tr><tr><td colspan="3" style="border:1px solid #333;padding:4px 6px;font-size:8.5pt;">${instrucoes}</td></tr></table></div>`;
   let qsHtml='';
   questoes.forEach((q,i)=>{
-    const num=i+1;
-    const numStr=String(num).padStart(2,'0');
-    const pts=q.pts.toFixed(1).replace('.',',');
-    qsHtml+=`<div style="margin-bottom:20px;font-family:Arial,sans-serif;font-size:11pt;page-break-inside:avoid;">`;
-    qsHtml+=`<div style="font-weight:bold;font-size:11.5pt;margin-bottom:6px;">QUESTÃO ${numStr} <span style="font-size:10pt;font-weight:normal;">(${pts} pts)</span></div>`;
-    if(q.distrator&&q.distrator.trim()){
-      qsHtml+=`<div style="border-left:3px solid #bbb;padding:5px 12px;margin-bottom:8px;font-style:italic;font-size:10.5pt;text-align:justify;background:#fafafa;">${q.distrator.replace(/\n/g,'<br>')}</div>`;
-    }
-    if(q.imagem){
-      qsHtml+=`<div style="margin-bottom:8px;text-align:center;"><img src="${q.imagem}" style="max-width:100%;max-height:200px;border-radius:4px;border:1px solid #ddd;"></div>`;
-    }
-    if(q.consigna&&q.consigna.trim()){
-      qsHtml+=`<div style="font-style:italic;margin-bottom:5px;font-size:10.5pt;color:#333;">${q.consigna}</div>`;
-    }
+    const numStr=String(i+1).padStart(2,'0'),pts=q.pts.toFixed(1).replace('.',',');
+    qsHtml+=`<div style="margin-bottom:20px;font-family:Arial,sans-serif;font-size:11pt;page-break-inside:avoid;"><div style="font-weight:bold;font-size:11.5pt;margin-bottom:6px;">QUESTÃO ${numStr} <span style="font-size:10pt;font-weight:normal;">(${pts} pts)</span></div>`;
+    if(q.distrator&&q.distrator.trim()) qsHtml+=`<div style="border-left:3px solid #bbb;padding:5px 12px;margin-bottom:8px;font-style:italic;font-size:10.5pt;background:#fafafa;">${q.distrator.replace(/\n/g,'<br>')}</div>`;
+    if(q.imagem) qsHtml+=`<div style="margin-bottom:8px;text-align:center;"><img src="${q.imagem}" style="max-width:100%;max-height:200px;border:1px solid #ddd;"></div>`;
+    if(q.consigna&&q.consigna.trim()) qsHtml+=`<div style="font-style:italic;margin-bottom:5px;font-size:10.5pt;color:#333;">${q.consigna}</div>`;
     qsHtml+=`<div style="margin-bottom:9px;text-align:justify;line-height:1.5;">${q.enunciado||'<em style="color:#999">[sem enunciado]</em>'}</div>`;
-    if(q.tipo==='multipla'){
-      q.alternativas.forEach(a=>{
-        if(!a.texto.trim()) return;
-        qsHtml+=`<div style="margin:4px 0 4px 18px;line-height:1.5;">${a.letra}) ${a.texto}</div>`;
-      });
-    } else if(q.tipo==='somatoria'){
-      qsHtml+=`<div style="font-size:10pt;color:#555;margin-bottom:6px;font-style:italic;">Some os valores das afirmativas VERDADEIRAS.</div>`;
-      q.somatoria.forEach(s=>{
-        if(!s.txt.trim()) return;
-        qsHtml+=`<div style="margin:4px 0 4px 18px;line-height:1.5;"><strong>(${String(s.v).padStart(2,'0')})</strong> ${s.txt}</div>`;
-      });
-    } else {
-      for(let l=0;l<(q.linhas||4);l++){
-        qsHtml+=`<div style="border-bottom:1px solid #aaa;height:28px;margin-bottom:4px;"></div>`;
-      }
-    }
-    qsHtml+=`<div style="border-bottom:1px dashed #ddd;margin-top:12px;"></div>`;
-    qsHtml+=`</div>`;
+    if(q.tipo==='multipla') q.alternativas.forEach(a=>{if(a.texto.trim()) qsHtml+=`<div style="margin:4px 0 4px 18px;line-height:1.5;">${a.letra}) ${a.texto}</div>`;});
+    else if(q.tipo==='somatoria'){qsHtml+=`<div style="font-size:10pt;color:#555;margin-bottom:6px;font-style:italic;">Some os valores das afirmativas VERDADEIRAS.</div>`; q.somatoria.forEach(s=>{if(s.txt.trim()) qsHtml+=`<div style="margin:4px 0 4px 18px;line-height:1.5;"><strong>(${String(s.v).padStart(2,'0')})</strong> ${s.txt}</div>`;});}
+    else{for(let l=0;l<(q.linhas||4);l++) qsHtml+=`<div style="border-bottom:1px solid #aaa;height:28px;margin-bottom:4px;"></div>`;}
+    qsHtml+=`<div style="border-bottom:1px dashed #ddd;margin-top:12px;"></div></div>`;
   });
-
   return wrap+qsHtml;
-}
-
-// ── AUTOSAVE ──
-function autoSave(){
-  try{
-    sessionStorage.setItem('gp_escola', document.getElementById('nomeEscola').value);
-    sessionStorage.setItem('gp_cidade', document.getElementById('cidadeEscola').value);
-    sessionStorage.setItem('gp_titulo', document.getElementById('tituloAval').value);
-  }catch(e){}
 }
 
 // ── EXPORT PDF ──
 async function exportPDF(){
-  const btnExp=document.getElementById('btnExport');
-  if(btnExp){btnExp.disabled=true;btnExp.textContent='⏳ Gerando PDF…';}
+  const btn=document.getElementById('btnExport');
+  btn.disabled=true; btn.textContent='⏳ Gerando PDF…';
   try{
-    const printDiv=document.createElement('div');
-    printDiv.style.cssText='position:absolute;left:-9999px;top:0;width:190mm;padding:10mm;background:white;';
-    printDiv.innerHTML=buildHTML();
-    document.body.appendChild(printDiv);
-    const images=printDiv.querySelectorAll('img');
-    await Promise.all(Array.from(images).map(img=>{
-      if(img.complete)return Promise.resolve();
-      return new Promise(resolve=>{img.onload=resolve;img.onerror=resolve;});
-    }));
-    const canvas=await html2canvas(printDiv,{scale:2,backgroundColor:'#ffffff',logging:false,useCORS:true});
-    document.body.removeChild(printDiv);
+    const d=document.createElement('div');
+    d.style.cssText='position:absolute;left:-9999px;top:0;width:190mm;padding:10mm;background:white;';
+    d.innerHTML=buildHTML(); document.body.appendChild(d);
+    await Promise.all(Array.from(d.querySelectorAll('img')).map(img=>img.complete?Promise.resolve():new Promise(r=>{img.onload=r;img.onerror=r;})));
+    const canvas=await html2canvas(d,{scale:2,backgroundColor:'#ffffff',logging:false,useCORS:true});
+    document.body.removeChild(d);
     const {jsPDF}=window.jspdf;
-    const imgData=canvas.toDataURL('image/png');
     const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
-    const imgWidth=190, pageHeight=277;
-    const imgHeight=(canvas.height*imgWidth)/canvas.width;
-    let heightLeft=imgHeight, position=0;
-    pdf.addImage(imgData,'PNG',10,10,imgWidth,imgHeight);
-    heightLeft-=pageHeight;
-    while(heightLeft>0){
-      position=heightLeft-imgHeight;
-      pdf.addPage();
-      pdf.addImage(imgData,'PNG',10,position,imgWidth,imgHeight);
-      heightLeft-=pageHeight;
-    }
-    const nomeEscola=document.getElementById('nomeEscola').value||'prova';
-    pdf.save(`${nomeEscola.replace(/\s+/g,'_')}.pdf`);
-  }catch(err){
-    console.error('Erro ao gerar PDF:',err);
-    alert('Erro ao gerar PDF:\n'+err.message+'\n\nTente usar Imprimir (Ctrl+P) e salvar como PDF.');
-  }finally{
-    if(btnExp){btnExp.disabled=false;btnExp.textContent='📄 Exportar PDF';}
-  }
+    const iw=190,ph=277,ih=(canvas.height*iw)/canvas.width;
+    let hl=ih,pos=0;
+    pdf.addImage(canvas.toDataURL('image/png'),'PNG',10,10,iw,ih);
+    hl-=ph;
+    while(hl>0){pos=hl-ih;pdf.addPage();pdf.addImage(canvas.toDataURL('image/png'),'PNG',10,pos,iw,ih);hl-=ph;}
+    pdf.save(`${(document.getElementById('nomeEscola').value||'prova').replace(/\s+/g,'_')}.pdf`);
+  }catch(err){alert('Erro ao gerar PDF:\n'+err.message);}
+  finally{btn.disabled=false;btn.textContent='📄 Exportar PDF';}
 }
 
-// ── EXPORT DOCX ──
+// ══════════════════════════════════════════════════════════════
+// EXPORT DOCX — usa JSZip (já carregado via cdnjs) + XML manual
+// ══════════════════════════════════════════════════════════════
 async function exportDOCX(){
-  const btnDocx=document.getElementById('btnDocx');
-  if(btnDocx){btnDocx.disabled=true;btnDocx.textContent='⏳ Carregando biblioteca…';}
-
-  let docxLib;
+  const btn=document.getElementById('btnDocx');
+  btn.disabled=true; btn.textContent='⏳ Gerando DOCX…';
   try{
-    // Carrega a lib de forma segura e aguarda
-    docxLib = await loadDocxLib();
-  }catch(err){
-    alert('Não foi possível carregar a biblioteca DOCX.\n\nVerifique sua conexão com a internet e tente novamente.\n\nDetalhe: '+err.message);
-    if(btnDocx){btnDocx.disabled=false;btnDocx.textContent='📝 Exportar DOCX';}
-    return;
-  }
-
-  if(btnDocx) btnDocx.textContent='⏳ Gerando DOCX…';
-
-  try{
-    const {
-      Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
-      AlignmentType, BorderStyle, WidthType, ShadingType, VerticalAlign
-    } = docxLib;
+    if(typeof JSZip==='undefined') throw new Error('JSZip não carregado. Verifique sua conexão.');
 
     const escola=document.getElementById('nomeEscola').value||'';
     const cidade=document.getElementById('cidadeEscola').value||'';
@@ -832,127 +442,229 @@ async function exportDOCX(){
     const dataFmt=dataStr==='Selecionar data…'?'___/___/____':dataStr;
     const letras=tipoProva==='em'?['A','B','C','D','E']:['A','B','C','D'];
 
-    const bdr={style:BorderStyle.SINGLE,size:4,color:'333333'};
-    const bdrAll={top:bdr,bottom:bdr,left:bdr,right:bdr};
-    const bdrN={style:BorderStyle.NONE,size:0,color:'FFFFFF'};
-    const noBdr={top:bdrN,bottom:bdrN,left:bdrN,right:bdrN};
+    // Helpers XML
+    const x=xmlEsc;
+    function twips(pt){return Math.round(pt*20);}
 
-    function txt(text,o){o=o||{};return new TextRun({text:String(text||''),font:'Arial',size:o.size!=null?o.size:20,bold:o.bold!=null?o.bold:false,italics:o.it!=null?o.it:false,color:o.color!=null?o.color:'000000'});}
-    function para(runs,o){o=o||{};return new Paragraph({alignment:o.align!=null?o.align:AlignmentType.LEFT,spacing:{before:o.before||0,after:o.after||0},indent:o.indent?{left:o.indent}:undefined,children:Array.isArray(runs)?runs:[runs]});}
-    function cell(children,o){o=o||{};return new TableCell({borders:o.borders!=null?o.borders:bdrAll,width:o.w?{size:o.w,type:WidthType.DXA}:undefined,columnSpan:o.span,rowSpan:o.rows,verticalAlign:o.vAlign!=null?o.vAlign:VerticalAlign.CENTER,shading:o.shade?{fill:o.shade,type:ShadingType.CLEAR}:undefined,margins:{top:o.mt||60,bottom:o.mb||60,left:o.ml||80,right:o.mr||80},children:Array.isArray(children)?children:[children]});}
+    // Parágrafo simples
+    function wPara(text,opts){
+      opts=opts||{};
+      const sz=opts.sz||22, bold=opts.bold?'<w:b/>':'', it=opts.it?'<w:i/>':'';
+      const color=opts.color?`<w:color w:val="${opts.color}"/>`:'';
+      const spB=opts.spB||0, spA=opts.spA||0;
+      const ind=opts.ind?`<w:ind w:left="${opts.ind}"/>`:'';
+      const jc=opts.center?'<w:jc w:val="center"/>':(opts.justify?'<w:jc w:val="both"/>':'');
+      const border=opts.borderBottom?`<w:pBdr><w:bottom w:val="single" w:sz="4" w:space="1" w:color="999999"/></w:pBdr>`:'';
+      const lines=String(text||'').split('\n');
+      return lines.map((line,li)=>`
+        <w:p>
+          <w:pPr>${jc}<w:spacing w:before="${li===0?spB:0}" w:after="${li===lines.length-1?spA:0}"/>${ind}${border}</w:pPr>
+          <w:r><w:rPr>${bold}${it}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/>${color}</w:rPr><w:t xml:space="preserve">${x(line)}</w:t></w:r>
+        </w:p>`).join('');
+    }
 
-    const colNW=480,colLW=350;
+    // Parágrafo com múltiplos runs
+    function wParaRuns(runs,opts){
+      opts=opts||{};
+      const spB=opts.spB||0,spA=opts.spA||0;
+      const ind=opts.ind?`<w:ind w:left="${opts.ind}"/>`:'';
+      const jc=opts.center?'<w:jc w:val="center"/>':(opts.justify?'<w:jc w:val="both"/>':'');
+      const border=opts.borderBottom?`<w:pBdr><w:bottom w:val="single" w:sz="2" w:space="1" w:color="E0E0E0"/></w:pBdr>`:'';
+      const runsXml=runs.map(r=>{
+        const sz=r.sz||22,bold=r.bold?'<w:b/>':'',it=r.it?'<w:i/>':'';
+        const color=r.color?`<w:color w:val="${r.color}"/>`:'';
+        return `<w:r><w:rPr>${bold}${it}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/>${color}</w:rPr><w:t xml:space="preserve">${x(r.t||'')}</w:t></w:r>`;
+      }).join('');
+      return `<w:p><w:pPr>${jc}<w:spacing w:before="${spB}" w:after="${spA}"/>${ind}${border}</w:pPr>${runsXml}</w:p>`;
+    }
+
+    // Célula de tabela
+    function wCell(content,opts){
+      opts=opts||{};
+      const w=opts.w?`<w:tcW w:w="${opts.w}" w:type="dxa"/>`:'';
+      const span=opts.span?`<w:gridSpan w:val="${opts.span}"/>`:'';
+      const vAlign=opts.vAlign||'center';
+      const shade=opts.shade?`<w:shd w:val="clear" w:color="auto" w:fill="${opts.shade}"/>`:'';
+      const bdr=opts.noBorder?`<w:tcBorders><w:top w:val="none"/><w:left w:val="none"/><w:bottom w:val="none"/><w:right w:val="none"/></w:tcBorders>`:`<w:tcBorders><w:top w:val="single" w:sz="4" w:color="333333"/><w:left w:val="single" w:sz="4" w:color="333333"/><w:bottom w:val="single" w:sz="4" w:color="333333"/><w:right w:val="single" w:sz="4" w:color="333333"/></w:tcBorders>`;
+      const m=opts.noBorder?'<w:tcMar><w:top w:w="0" w:type="dxa"/><w:left w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="60" w:type="dxa"/></w:tcMar>':'<w:tcMar><w:top w:w="60" w:type="dxa"/><w:left w:w="80" w:type="dxa"/><w:bottom w:w="60" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tcMar>';
+      return `<w:tc><w:tcPr>${w}${span}${shade}${bdr}<w:vAlign w:val="${vAlign}"/>${m}</w:tcPr>${content}</w:tc>`;
+    }
+
+    // ── GABARITO ──
+    const colNW=480, colLW=350;
     const gabW=colNW+(letras.length+1)*colLW;
     const cabW=9638-gabW;
+    const colWidthsGab=[colNW,...letras.map(()=>colLW),colLW].join(',');
 
-    var gabRows=[];
-    var gabHdrCells=[cell(para([txt('Nº',{bold:true,size:16})],{align:AlignmentType.CENTER}),{w:colNW,shade:'E8E8E8'})];
-    letras.forEach(function(l){gabHdrCells.push(cell(para([txt(l,{bold:true,size:16})],{align:AlignmentType.CENTER}),{w:colLW,shade:'E8E8E8'}));});
-    gabHdrCells.push(cell(para([txt('\u2713',{bold:true,size:14})],{align:AlignmentType.CENTER}),{w:colLW,shade:'E8E8E8'}));
-    gabRows.push(gabHdrCells);
-    questoes.forEach(function(q,i){
-      var shade=i%2===0?'F5F5F5':'FFFFFF';
-      var correta=q.tipo==='multipla'?q.alternativas.find(function(a){return a.correta;}):null;
-      var row=[cell(para([txt(String(i+1),{bold:true,size:16})],{align:AlignmentType.CENTER}),{w:colNW,shade:shade})];
+    let gabRows='';
+    // Header
+    let gabHdr=wCell(wPara('Nº',{bold:true,sz:16,center:true}),{w:colNW,shade:'E8E8E8'});
+    letras.forEach(l=>{ gabHdr+=wCell(wPara(l,{bold:true,sz:16,center:true}),{w:colLW,shade:'E8E8E8'}); });
+    gabHdr+=wCell(wPara('✓',{bold:true,sz:14,center:true}),{w:colLW,shade:'E8E8E8'});
+    gabRows+=`<w:tr>${gabHdr}</w:tr>`;
+
+    questoes.forEach((q,i)=>{
+      const shade=i%2===0?'F5F5F5':'FFFFFF';
+      const correta=q.tipo==='multipla'?q.alternativas.find(a=>a.correta):null;
+      let row=wCell(wPara(String(i+1),{bold:true,sz:16,center:true}),{w:colNW,shade});
       if(q.tipo==='discursiva'){
-        row.push(cell(para([txt('Discursiva',{size:13,it:true})],{align:AlignmentType.CENTER}),{span:letras.length+1,shade:shade}));
+        row+=wCell(wPara('Discursiva',{sz:13,it:true,center:true}),{span:letras.length+1,shade});
       } else if(q.tipo==='somatoria'){
-        var soma=q.somatoria.filter(function(s){return s.ok;}).reduce(function(a,s){return a+s.v;},0);
-        row.push(cell(para([txt('= '+(soma||'\u2014'),{bold:true,size:14})],{align:AlignmentType.CENTER}),{span:letras.length+1,shade:shade}));
+        const soma=q.somatoria.filter(s=>s.ok).reduce((a,s)=>a+s.v,0);
+        row+=wCell(wPara('= '+(soma||'—'),{bold:true,sz:14,center:true}),{span:letras.length+1,shade});
       } else {
-        letras.forEach(function(l){
-          var isOk=correta&&correta.letra===l;
-          row.push(cell(para([txt(l,{bold:isOk,size:16,color:isOk?'166534':'000000'})],{align:AlignmentType.CENTER}),{w:colLW,shade:shade}));
+        letras.forEach(l=>{
+          const isOk=correta&&correta.letra===l;
+          row+=wCell(wPara(l,{bold:isOk,sz:16,center:true,color:isOk?'166534':undefined}),{w:colLW,shade});
         });
-        row.push(cell(para([txt('')]),{w:colLW,shade:shade}));
+        row+=wCell(wPara(''),{w:colLW,shade});
       }
-      gabRows.push(row);
+      gabRows+=`<w:tr>${row}</w:tr>`;
     });
 
-    var cabRows=[
-      new TableRow({children:[cell(para([txt(escola,{bold:true,size:24})],{align:AlignmentType.CENTER}),{w:cabW})]}),
-      new TableRow({children:[cell(para([txt(cidade,{size:18})],{align:AlignmentType.CENTER}),{w:cabW})]}),
-      new TableRow({children:[cell(para([txt(titulo,{bold:true,size:22})],{align:AlignmentType.CENTER}),{w:cabW})]}),
-      new TableRow({children:[cell(para([txt('Professor(a): ',{bold:true,size:19}),txt(prof||'________________________',{size:19}),txt('    Disciplina: ',{bold:true,size:19}),txt(disc||'____________',{size:19})]),{w:cabW})]}),
-      new TableRow({children:[cell(para([txt('Aluno(a): _______________________________  ',{size:19}),txt('Série: ',{bold:true,size:19}),txt(serie+'  ',{size:19}),txt('Turma: ',{bold:true,size:19}),txt((turma||'___')+'  ',{size:19}),txt('Trim.: ',{bold:true,size:19}),txt(trimVal+'  ',{size:19}),txt('Data: ',{bold:true,size:19}),txt(dataFmt,{size:19})]),{w:cabW})]}),
-      new TableRow({children:[cell(para([txt('Assinatura do responsável: _______________________   Data: ___/___/___',{size:19})]),{w:cabW})]}),
-      new TableRow({children:[cell(para([txt(instrText,{size:18,it:true})]),{w:cabW})]}),
-    ];
-    var cabTable=new Table({width:{size:cabW,type:WidthType.DXA},columnWidths:[cabW],rows:cabRows});
-    var gabColWidths=[colNW].concat(letras.map(function(){return colLW;})).concat([colLW]);
-    var gabTableRows=gabRows.map(function(cells){return new TableRow({children:cells});});
-    var gabTable=new Table({width:{size:gabW,type:WidthType.DXA},columnWidths:gabColWidths,rows:gabTableRows});
-    var wrapTable=new Table({width:{size:9638,type:WidthType.DXA},columnWidths:[cabW,gabW],rows:[new TableRow({children:[
-      new TableCell({borders:noBdr,width:{size:cabW,type:WidthType.DXA},verticalAlign:VerticalAlign.TOP,margins:{top:0,bottom:0,left:0,right:60},children:[cabTable]}),
-      new TableCell({borders:noBdr,width:{size:gabW,type:WidthType.DXA},verticalAlign:VerticalAlign.TOP,margins:{top:0,bottom:0,left:0,right:0},children:[gabTable]}),
-    ]})]});
+    const gabTable=`<w:tbl><w:tblPr><w:tblW w:w="${gabW}" w:type="dxa"/><w:tblBorders><w:insideH w:val="single" w:sz="4" w:color="333333"/><w:insideV w:val="single" w:sz="4" w:color="333333"/></w:tblBorders></w:tblPr><w:tblGrid>${[colNW,...letras.map(()=>colLW),colLW].map(w=>`<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>${gabRows}</w:tbl>`;
 
-    var qChildren=[new Paragraph({spacing:{before:200,after:0},children:[txt('')]})];
-    questoes.forEach(function(q,i){
-      var num=i+1;
-      var numStr=String(num).padStart(2,'0');
-      var pts=q.pts.toFixed(1).replace('.',',');
-      qChildren.push(para([
-        txt('QUESTÃO '+numStr+' ',{bold:true,size:22}),
-        txt('('+pts+' pts)',{size:18,color:'555555'}),
-      ],{before:160,after:60}));
+    // ── CABEÇALHO ──
+    const cabContent=
+      wPara(escola,{bold:true,sz:26,center:true,spA:40})+
+      wPara(cidade,{sz:18,center:true,spA:40})+
+      wPara(titulo,{bold:true,sz:24,center:true,spA:60})+
+      wParaRuns([{t:'Professor(a): ',bold:true,sz:19},{t:prof||'________________________',sz:19},{t:'    Disciplina: ',bold:true,sz:19},{t:disc||'____________',sz:19}],{spA:30})+
+      wParaRuns([{t:'Aluno(a): _________________________________  ',sz:19},{t:'Série: ',bold:true,sz:19},{t:serie+'  ',sz:19},{t:'Turma: ',bold:true,sz:19},{t:(turma||'___')+'  ',sz:19},{t:'Trim.: ',bold:true,sz:19},{t:trimVal+'  ',sz:19},{t:'Data: ',bold:true,sz:19},{t:dataFmt,sz:19}],{spA:30})+
+      wPara('Assinatura do responsável: _______________________   Data: ___/___/___',{sz:19,spA:30})+
+      wPara(instrText,{sz:18,it:true});
+
+    const cabTable=`<w:tbl><w:tblPr><w:tblW w:w="${cabW}" w:type="dxa"/><w:tblBorders><w:top w:val="single" w:sz="4" w:color="333333"/><w:left w:val="single" w:sz="4" w:color="333333"/><w:bottom w:val="single" w:sz="4" w:color="333333"/><w:right w:val="single" w:sz="4" w:color="333333"/><w:insideH w:val="single" w:sz="4" w:color="333333"/><w:insideV w:val="single" w:sz="4" w:color="333333"/></w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="${cabW}"/></w:tblGrid><w:tr>${wCell(cabContent,{w:cabW})}</w:tr></w:tbl>`;
+
+    // Tabela wrapper (cabeçalho | gabarito)
+    const wrapTable=`<w:tbl><w:tblPr><w:tblW w:w="9638" w:type="dxa"/><w:tblBorders><w:top w:val="none"/><w:left w:val="none"/><w:bottom w:val="none"/><w:right w:val="none"/><w:insideH w:val="none"/><w:insideV w:val="none"/></w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="${cabW}"/><w:gridCol w:w="${gabW}"/></w:tblGrid><w:tr>${wCell(cabTable,{w:cabW,noBorder:true,vAlign:'top'})}${wCell(gabTable,{w:gabW,noBorder:true,vAlign:'top'})}</w:tr></w:tbl>`;
+
+    // ── QUESTÕES ──
+    let qsXml='<w:p><w:pPr><w:spacing w:before="200" w:after="0"/></w:pPr></w:p>';
+    questoes.forEach((q,i)=>{
+      const numStr=String(i+1).padStart(2,'0');
+      const pts=q.pts.toFixed(1).replace('.',',');
+
+      qsXml+=wParaRuns([{t:'QUESTÃO '+numStr+' ',bold:true,sz:24},{t:'('+pts+' pts)',sz:18,color:'555555'}],{spB:160,spA:60});
+
       if(q.distrator&&q.distrator.trim()){
-        q.distrator.split('\n').forEach(function(line){
-          qChildren.push(para([txt(line,{size:19,it:true,color:'444444'})],{before:40,after:0,indent:360}));
-        });
-        qChildren.push(new Paragraph({spacing:{before:40},children:[txt('')]}));
+        q.distrator.split('\n').forEach(line=>{ qsXml+=wPara(line,{sz:19,it:true,color:'444444',ind:360,spB:40}); });
+        qsXml+=wPara('',{spB:40});
       }
-      if(q.consigna&&q.consigna.trim()){
-        qChildren.push(para([txt(q.consigna,{size:19,it:true,color:'333333'})],{before:40,after:40}));
-      }
-      qChildren.push(para([txt(q.enunciado||'[sem enunciado]',{size:21})],{before:40,after:60}));
+      if(q.consigna&&q.consigna.trim()) qsXml+=wPara(q.consigna,{sz:19,it:true,color:'333333',spB:40,spA:40});
+      qsXml+=wPara(q.enunciado||'[sem enunciado]',{sz:21,justify:true,spB:40,spA:60});
+
       if(q.tipo==='multipla'){
-        q.alternativas.forEach(function(a){
-          if(!a.texto.trim())return;
-          qChildren.push(para([txt(a.letra+') ',{bold:true,size:20}),txt(a.texto,{size:20})],{before:30,after:0,indent:360}));
-        });
+        q.alternativas.forEach(a=>{ if(a.texto.trim()) qsXml+=wParaRuns([{t:a.letra+') ',bold:true,sz:20},{t:a.texto,sz:20}],{ind:360,spB:30}); });
       } else if(q.tipo==='somatoria'){
-        qChildren.push(para([txt('Some os valores das afirmativas VERDADEIRAS.',{size:17,it:true,color:'555555'})],{before:30,after:30}));
-        q.somatoria.forEach(function(s){
-          if(!s.txt.trim())return;
-          qChildren.push(para([
-            txt('('+String(s.v).padStart(2,'0')+') ',{bold:true,size:20,color:'92400e'}),
-            txt(s.txt,{size:20}),
-          ],{before:30,after:0,indent:360}));
-        });
+        qsXml+=wPara('Some os valores das afirmativas VERDADEIRAS.',{sz:17,it:true,color:'555555',spB:30,spA:30});
+        q.somatoria.forEach(s=>{ if(s.txt.trim()) qsXml+=wParaRuns([{t:'('+String(s.v).padStart(2,'0')+') ',bold:true,sz:20,color:'92400e'},{t:s.txt,sz:20}],{ind:360,spB:30}); });
       } else {
-        for(var l=0;l<(q.linhas||4);l++){
-          qChildren.push(new Paragraph({
-            spacing:{before:40,after:0},
-            border:{bottom:{style:BorderStyle.SINGLE,size:4,color:'999999'}},
-            children:[txt('')],
-          }));
-        }
+        for(let l=0;l<(q.linhas||4);l++) qsXml+=wPara('',{spB:40,borderBottom:true});
       }
-      qChildren.push(new Paragraph({
-        spacing:{before:80,after:0},
-        border:{bottom:{style:BorderStyle.SINGLE,size:2,color:'E0E0E0'}},
-        children:[txt('')],
-      }));
+      qsXml+=wParaRuns([],{spB:80,borderBottom:true});
     });
 
-    var doc=new Document({sections:[{properties:{page:{size:{width:11906,height:16838},margin:{top:1134,right:1134,bottom:1134,left:1134}}},children:[wrapTable].concat(qChildren)}]});
-    var base64=await Packer.toBase64String(doc);
-    var binary=atob(base64);
-    var bytes=new Uint8Array(binary.length);
-    for(var b=0;b<binary.length;b++) bytes[b]=binary.charCodeAt(b);
-    var blob=new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
-    var url=URL.createObjectURL(blob);
-    var a=document.createElement('a');
-    a.href=url; a.download=(escola.replace(/\s+/g,'_')||'prova')+'.docx';
+    // ── DOCUMENT.XML ──
+    const documentXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"
+  xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex"
+  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+  xmlns:aink="http://schemas.microsoft.com/office/drawing/2016/ink"
+  xmlns:am3d="http://schemas.microsoft.com/office/drawing/2017/model3d"
+  xmlns:o="urn:schemas-microsoft-com:office:office"
+  xmlns:oel="http://schemas.microsoft.com/office/2019/extlst"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+  xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"
+  xmlns:v="urn:schemas-microsoft-com:vml"
+  xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing"
+  xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+  xmlns:w10="urn:schemas-microsoft-com:office:word"
+  xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+  xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"
+  xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml"
+  xmlns:w16cex="http://schemas.microsoft.com/office/word/2018/wordml/cex"
+  xmlns:w16cid="http://schemas.microsoft.com/office/word/2016/wordml/cid"
+  xmlns:w16="http://schemas.microsoft.com/office/word/2018/wordml"
+  xmlns:w16sdtdh="http://schemas.microsoft.com/office/word/2020/wordml/sdtdatahash"
+  xmlns:w16se="http://schemas.microsoft.com/office/word/2015/wordml/symex"
+  xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup"
+  xmlns:wpi="http://schemas.microsoft.com/office/word/2010/wordprocessingInk"
+  xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml"
+  xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+  mc:Ignorable="w14 w15 w16se w16cid w16 w16cex w16sdtdh wp14">
+  <w:body>
+    ${wrapTable}
+    ${qsXml}
+    <w:sectPr>
+      <w:pgSz w:w="11906" w:h="16838"/>
+      <w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="709" w:footer="709" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>`;
+
+    // ── ARQUIVOS DO PACOTE DOCX ──
+    const contentTypes=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+  <Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>
+</Types>`;
+
+    const rels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`;
+
+    const wordRels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>
+</Relationships>`;
+
+    const stylesXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+          xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:docDefaults>
+    <w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr></w:rPrDefault>
+    <w:pPrDefault><w:pPr><w:spacing w:after="0" w:line="276" w:lineRule="auto"/></w:pPr></w:pPrDefault>
+  </w:docDefaults>
+  <w:style w:type="paragraph" w:styleId="Normal" w:default="1">
+    <w:name w:val="Normal"/>
+    <w:pPr><w:spacing w:after="0"/></w:pPr>
+    <w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="22"/></w:rPr>
+  </w:style>
+</w:styles>`;
+
+    const settingsXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:defaultTabStop w:val="708"/>
+  <w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat>
+</w:settings>`;
+
+    // ── MONTA O ZIP ──
+    const zip=new JSZip();
+    zip.file('[Content_Types].xml', contentTypes);
+    zip.file('_rels/.rels', rels);
+    zip.file('word/document.xml', documentXml);
+    zip.file('word/_rels/document.xml.rels', wordRels);
+    zip.file('word/styles.xml', stylesXml);
+    zip.file('word/settings.xml', settingsXml);
+
+    const blob=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',compression:'DEFLATE',compressionOptions:{level:6}});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download=`${(escola.replace(/\s+/g,'_')||'prova')}.docx`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
+
   }catch(err){
     console.error('Erro ao gerar DOCX:',err);
     alert('Erro ao gerar DOCX:\n'+err.message);
   }finally{
-    var btn2=document.getElementById('btnDocx');
-    if(btn2){btn2.disabled=false;btn2.textContent='📝 Exportar DOCX';}
+    btn.disabled=false; btn.textContent='📝 Exportar DOCX';
   }
 }
 </script>
