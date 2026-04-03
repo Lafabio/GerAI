@@ -7,10 +7,6 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script>
-/* ── DOCX LIB (docx.js bundled inline – omitted here, loaded from CDN below) ── */
-</script>
-<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.js"></script>
 <style>
 :root{--bg:#eeebe6;--sf:#faf9f7;--card:#fff;--br:#d4cfc6;--brs:#a5a09a;--tx:#1a1916;--mu:#7a7570;--ac:#1d4ed8;--acbg:#eff6ff;--dn:#b91c1c;--ok:#166534;--wn:#92400e;--wnbg:#fef9c3;--r:8px;--sh:0 1px 3px rgba(0,0,0,.08)}
 *{margin:0;padding:0;box-sizing:border-box}
@@ -100,7 +96,6 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tx)
 .alt-in:focus{outline:none;border-color:var(--ac);background:#fff}
 .alt-radio{width:14px;height:14px;accent-color:var(--ok);cursor:pointer}
 .alt-rl{font-size:9px;color:var(--mu)}
-/* ── SOMATÓRIA ── */
 .somat{display:flex;flex-direction:column;gap:5px;margin-top:4px}
 .somat-r{display:flex;align-items:center;gap:7px}
 .somat-v{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:var(--wn);width:28px;text-align:right;flex-shrink:0}
@@ -113,9 +108,6 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tx)
 .somat-rem{background:#fee2e2;border:1px solid #fca5a5;color:var(--dn);font-size:11px;font-weight:700;padding:4px 10px;border-radius:5px;cursor:pointer;font-family:'IBM Plex Sans',sans-serif}
 .somat-add:hover{background:#1e40af}
 .somat-rem:hover{background:#fecaca}
-/* ── PREVIEW QUESTÃO ── */
-.q-preview-header{font-family:Arial,sans-serif;font-size:10.5pt;font-weight:bold;margin-bottom:4px;display:flex;gap:6px;align-items:baseline}
-.q-preview-header .q-num-lbl{color:var(--ac);font-size:11px}
 .pts-in{width:46px;font-family:'IBM Plex Sans',sans-serif;font-size:11px;border:1px solid var(--br);border-radius:5px;padding:2px 5px;text-align:center}
 .add-btn{width:100%;max-width:880px;margin:0 auto 8px;padding:11px;border:2px dashed var(--br);border-radius:var(--r);background:transparent;font-family:'IBM Plex Sans',sans-serif;font-size:12px;font-weight:600;color:var(--mu);cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:7px}
 .add-btn:hover{border-color:var(--ac);color:var(--ac);background:var(--acbg)}
@@ -269,10 +261,52 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tx)
 let tipoProva='efaf', questoes=[], qId=0, logoB64=null;
 let professors=[], disciplinas=[], selectedDate=null;
 let calYear=new Date().getFullYear(), calMonth=new Date().getMonth();
+// Cache da lib docx carregada dinamicamente
+let _docxLib=null;
 
 const LEM=['A','B','C','D','E'], LEF=['A','B','C','D'];
-// Sequência padrão de valores da somatória
 const SOMA_SEQ=[1,2,4,8,16,32,64];
+
+// ── CARREGA DOCX DINAMICAMENTE ──
+async function loadDocxLib(){
+  if(_docxLib) return _docxLib;
+  return new Promise((resolve,reject)=>{
+    // Remove script antigo se existir
+    const old=document.getElementById('_docxScript');
+    if(old) old.remove();
+    const s=document.createElement('script');
+    s.id='_docxScript';
+    // Tenta jsdelivr primeiro (mais confiável para UMD)
+    s.src='https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.js';
+    s.onload=()=>{
+      // A lib registra como window.docx
+      const lib=window.docx;
+      if(lib && lib.Document){
+        _docxLib=lib;
+        resolve(lib);
+      } else {
+        reject(new Error('Biblioteca docx carregada mas não encontrada em window.docx'));
+      }
+    };
+    s.onerror=()=>{
+      // Fallback: unpkg
+      const s2=document.createElement('script');
+      s2.src='https://unpkg.com/docx@8.5.0/build/index.js';
+      s2.onload=()=>{
+        const lib=window.docx;
+        if(lib && lib.Document){
+          _docxLib=lib;
+          resolve(lib);
+        } else {
+          reject(new Error('Não foi possível carregar a biblioteca docx. Verifique sua conexão.'));
+        }
+      };
+      s2.onerror=()=>reject(new Error('Falha ao carregar a biblioteca docx dos dois CDNs.'));
+      document.head.appendChild(s2);
+    };
+    document.head.appendChild(s);
+  });
+}
 
 // ── INIT ──
 window.addEventListener('DOMContentLoaded',()=>{
@@ -283,6 +317,8 @@ window.addEventListener('DOMContentLoaded',()=>{
   document.addEventListener('click',e=>{
     if(!e.target.closest('.cal-wrap')) document.getElementById('calPop').classList.remove('open');
   });
+  // Pré-carrega a lib docx em background para não travar no clique
+  loadDocxLib().catch(()=>{});
 });
 
 // ── LOGO ──
@@ -394,7 +430,6 @@ function addQ(tipo){
     distrator:'', imagem:null, consigna:'', enunciado:'',
     pts:parseFloat(document.getElementById('ptsDefault').value)||1,
     alternativas:letras.map((l,i)=>({letra:l,texto:'',correta:i===0})),
-    // Somatória começa com os 4 primeiros valores: 01, 02, 04, 08
     somatoria:[
       {v:1,txt:'',ok:false},
       {v:2,txt:'',ok:false},
@@ -444,16 +479,13 @@ function setTipoQ(id,tipo){
   renderAll();
 }
 
-// ── SOMATÓRIA: adicionar / remover itens ──
 function addSomatItem(id){
   const q=questoes.find(q=>q.id===id);
   if(!q)return;
   const used=q.somatoria.map(s=>s.v);
-  // Próximo valor da sequência não usado
   const next=SOMA_SEQ.find(v=>!used.includes(v));
   if(!next){alert('Todos os valores da sequência (01→64) já foram adicionados.');return;}
   q.somatoria.push({v:next,txt:'',ok:false});
-  // Reordenar pela sequência
   q.somatoria.sort((a,b)=>SOMA_SEQ.indexOf(a.v)-SOMA_SEQ.indexOf(b.v));
   renderAll();
 }
@@ -486,7 +518,6 @@ function renderQ(q){
     ?`<img src="${q.imagem}"><br><button class="img-rm" onclick="event.stopPropagation();rmImg(${q.id})">✕ Remover imagem</button>`
     :'<p>📷 Clique para adicionar imagem (opcional)</p>';
 
-  // ── ÁREA DO TIPO ──
   let tipoArea='';
   if(q.tipo==='multipla'){
     tipoArea=`<div class="qf"><label>Alternativas <span style="color:var(--mu);font-weight:400;font-size:9px;">(marque o gabarito)</span></label>
@@ -513,7 +544,7 @@ function renderQ(q){
     </div>
     <div class="somat-hint" id="somat-hint-${q.id}">Gabarito da somatória: <strong>${soma||'—'}</strong></div>
     <div class="somat-btns">
-      <button class="somat-add" onclick="addSomatItem(${q.id})" ${canAdd?'':'disabled'} title="Adicionar próximo valor (${canAdd?SOMA_SEQ.find(v=>!q.somatoria.map(s=>s.v).includes(v)):'—'})">+ Adicionar item</button>
+      <button class="somat-add" onclick="addSomatItem(${q.id})" ${canAdd?'':'disabled'}>+ Adicionar item</button>
       <button class="somat-rem" onclick="remSomatItem(${q.id})" ${canRem?'':'disabled'}>− Remover último</button>
     </div>
     </div>`;
@@ -525,8 +556,6 @@ function renderQ(q){
     </div></div>`;
   }
 
-  // ── HTML DA QUESTÃO ──
-  // ORDEM: cabeçalho → distrator → imagem → consigna → enunciado → tipo-específico
   div.innerHTML=`
   <div class="qtop">
     <span class="qnum">QUESTÃO ${numStr}</span>
@@ -550,13 +579,11 @@ function renderQ(q){
     <button class="qtbtn ${q.tipo==='discursiva'?'active':''}" onclick="setTipoQ(${q.id},'discursiva')">Discursiva</button>
   </div>
 
-  <!-- 1. TEXTO DISTRATOR -->
   <div class="qf">
     <label>① Texto Distrator (opcional)</label>
     <textarea placeholder="Cole aqui o texto base, trecho, tabela ou poema que serve de suporte para a questão…" oninput="setF(${q.id},'distrator',this.value)">${q.distrator||''}</textarea>
   </div>
 
-  <!-- 2. IMAGEM -->
   <div class="qf">
     <label>② Imagem (opcional)</label>
     <div class="imgdrop" onclick="document.getElementById('qi-${q.id}').click()">
@@ -565,19 +592,16 @@ function renderQ(q){
     </div>
   </div>
 
-  <!-- 3. CONSIGNA -->
   <div class="qf">
     <label>③ Consigna / instrução (opcional)</label>
     <input type="text" value="${esc(q.consigna||'')}" placeholder="Ex: Assinale a alternativa correta." oninput="setF(${q.id},'consigna',this.value)">
   </div>
 
-  <!-- 4. ENUNCIADO -->
   <div class="qf">
     <label>④ Enunciado da Questão *</label>
     <textarea rows="3" placeholder="Digite o enunciado completo da questão…" oninput="setF(${q.id},'enunciado',this.value)">${q.enunciado||''}</textarea>
   </div>
 
-  <!-- 5. ALTERNATIVAS / LINHAS / SOMATÓRIA -->
   ${tipoArea}`;
 
   cont.appendChild(div);
@@ -621,7 +645,7 @@ function resetAll(){
 function openPreview(){ document.getElementById('modalBd').innerHTML=buildHTML(true); document.getElementById('modalPreview').classList.remove('hidden'); }
 function closePreview(){ document.getElementById('modalPreview').classList.add('hidden'); }
 
-// ── BUILD HTML (cabeçalho INTACTO + questões na ordem correta) ──
+// ── BUILD HTML ──
 function buildHTML(isPreview=false){
   const escola=document.getElementById('nomeEscola').value;
   const cidade=document.getElementById('cidadeEscola').value;
@@ -635,7 +659,6 @@ function buildHTML(isPreview=false){
   const dataStr=document.getElementById('calBtn').textContent.trim();
   const letras=tipoProva==='em'?[...LEM]:[...LEF];
 
-  // ── GABARITO (inalterado) ──
   let gabHtml=`<table style="width:152px;border-collapse:collapse;border:1.5px solid #333;font-family:Arial,sans-serif;font-size:8.5pt;float:right;margin-left:8px;">
   <tr style="background:#e8e8e8;"><th style="border:1px solid #333;padding:3px 5px;text-align:center;">Nº</th><th style="border:1px solid #333;padding:3px 5px;text-align:center;" colspan="${letras.length+1}">Gabarito</th></tr>`;
   questoes.forEach((q,i)=>{
@@ -659,12 +682,10 @@ function buildHTML(isPreview=false){
   });
   gabHtml+=`</table>`;
 
-  // ── LOGO ──
   const logoHtml=logoB64
     ?`<img src="${logoB64}" style="max-width:85px;max-height:65px;object-fit:contain;">`
     :`<div style="width:85px;height:65px;border:1px dashed #ccc;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#aaa;text-align:center;">Logo</div>`;
 
-  // ── CABEÇALHO (INALTERADO) ──
   const wrap=`<div style="overflow:hidden;font-family:Arial,sans-serif;margin-bottom:14px;">
     ${gabHtml}
     <table style="border-collapse:collapse;border:1.5px solid #333;font-family:Arial,sans-serif;font-size:9pt;width:calc(100% - 160px);">
@@ -686,37 +707,23 @@ function buildHTML(isPreview=false){
      </table>
   </div>`;
 
-  // ── QUESTÕES (NOVA ORDEM) ──
-  // QUESTÃO XX (pts) → Distrator → Imagem → Consigna → Enunciado → Alternativas/Linhas/Somatória
   let qsHtml='';
   questoes.forEach((q,i)=>{
     const num=i+1;
     const numStr=String(num).padStart(2,'0');
     const pts=q.pts.toFixed(1).replace('.',',');
     qsHtml+=`<div style="margin-bottom:20px;font-family:Arial,sans-serif;font-size:11pt;page-break-inside:avoid;">`;
-
-    // 1. Cabeçalho: QUESTÃO XX (pts) + distrator logo após se existir
     qsHtml+=`<div style="font-weight:bold;font-size:11.5pt;margin-bottom:6px;">QUESTÃO ${numStr} <span style="font-size:10pt;font-weight:normal;">(${pts} pts)</span></div>`;
-
-    // 2. Texto distrator
     if(q.distrator&&q.distrator.trim()){
       qsHtml+=`<div style="border-left:3px solid #bbb;padding:5px 12px;margin-bottom:8px;font-style:italic;font-size:10.5pt;text-align:justify;background:#fafafa;">${q.distrator.replace(/\n/g,'<br>')}</div>`;
     }
-
-    // 3. Imagem
     if(q.imagem){
       qsHtml+=`<div style="margin-bottom:8px;text-align:center;"><img src="${q.imagem}" style="max-width:100%;max-height:200px;border-radius:4px;border:1px solid #ddd;"></div>`;
     }
-
-    // 4. Consigna
     if(q.consigna&&q.consigna.trim()){
       qsHtml+=`<div style="font-style:italic;margin-bottom:5px;font-size:10.5pt;color:#333;">${q.consigna}</div>`;
     }
-
-    // 5. Enunciado
     qsHtml+=`<div style="margin-bottom:9px;text-align:justify;line-height:1.5;">${q.enunciado||'<em style="color:#999">[sem enunciado]</em>'}</div>`;
-
-    // 6. Tipo específico
     if(q.tipo==='multipla'){
       q.alternativas.forEach(a=>{
         if(!a.texto.trim()) return;
@@ -729,13 +736,10 @@ function buildHTML(isPreview=false){
         qsHtml+=`<div style="margin:4px 0 4px 18px;line-height:1.5;"><strong>(${String(s.v).padStart(2,'0')})</strong> ${s.txt}</div>`;
       });
     } else {
-      // Discursiva: linhas com espaçamento 1,5
       for(let l=0;l<(q.linhas||4);l++){
         qsHtml+=`<div style="border-bottom:1px solid #aaa;height:28px;margin-bottom:4px;"></div>`;
       }
     }
-
-    // Separador entre questões
     qsHtml+=`<div style="border-bottom:1px dashed #ddd;margin-top:12px;"></div>`;
     qsHtml+=`</div>`;
   });
@@ -795,13 +799,26 @@ async function exportPDF(){
 // ── EXPORT DOCX ──
 async function exportDOCX(){
   const btnDocx=document.getElementById('btnDocx');
-  if(btnDocx){btnDocx.disabled=true;btnDocx.textContent='⏳ Gerando DOCX…';}
+  if(btnDocx){btnDocx.disabled=true;btnDocx.textContent='⏳ Carregando biblioteca…';}
+
+  let docxLib;
   try{
-    const docxLib = window.docx || docx;
+    // Carrega a lib de forma segura e aguarda
+    docxLib = await loadDocxLib();
+  }catch(err){
+    alert('Não foi possível carregar a biblioteca DOCX.\n\nVerifique sua conexão com a internet e tente novamente.\n\nDetalhe: '+err.message);
+    if(btnDocx){btnDocx.disabled=false;btnDocx.textContent='📝 Exportar DOCX';}
+    return;
+  }
+
+  if(btnDocx) btnDocx.textContent='⏳ Gerando DOCX…';
+
+  try{
     const {
-      Document,Packer,Paragraph,TextRun,Table,TableRow,TableCell,
-      AlignmentType,BorderStyle,WidthType,ShadingType,VerticalAlign
-    }=docxLib;
+      Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+      AlignmentType, BorderStyle, WidthType, ShadingType, VerticalAlign
+    } = docxLib;
+
     const escola=document.getElementById('nomeEscola').value||'';
     const cidade=document.getElementById('cidadeEscola').value||'';
     const titulo=document.getElementById('tituloAval').value||'AVALIAÇÃO';
@@ -812,7 +829,7 @@ async function exportDOCX(){
     const trimVal=document.getElementById('selTrim').value||'';
     const instrText=document.getElementById('instrucoes').value||'';
     const dataStr=document.getElementById('calBtn').textContent.trim();
-    const dataFmt=dataStr==='Selecionar data\u2026'?'___/___/____':dataStr;
+    const dataFmt=dataStr==='Selecionar data…'?'___/___/____':dataStr;
     const letras=tipoProva==='em'?['A','B','C','D','E']:['A','B','C','D'];
 
     const bdr={style:BorderStyle.SINGLE,size:4,color:'333333'};
@@ -828,7 +845,6 @@ async function exportDOCX(){
     const gabW=colNW+(letras.length+1)*colLW;
     const cabW=9638-gabW;
 
-    // Gabarito
     var gabRows=[];
     var gabHdrCells=[cell(para([txt('Nº',{bold:true,size:16})],{align:AlignmentType.CENTER}),{w:colNW,shade:'E8E8E8'})];
     letras.forEach(function(l){gabHdrCells.push(cell(para([txt(l,{bold:true,size:16})],{align:AlignmentType.CENTER}),{w:colLW,shade:'E8E8E8'}));});
@@ -853,7 +869,6 @@ async function exportDOCX(){
       gabRows.push(row);
     });
 
-    // Cabeçalho da tabela
     var cabRows=[
       new TableRow({children:[cell(para([txt(escola,{bold:true,size:24})],{align:AlignmentType.CENTER}),{w:cabW})]}),
       new TableRow({children:[cell(para([txt(cidade,{size:18})],{align:AlignmentType.CENTER}),{w:cabW})]}),
@@ -872,36 +887,25 @@ async function exportDOCX(){
       new TableCell({borders:noBdr,width:{size:gabW,type:WidthType.DXA},verticalAlign:VerticalAlign.TOP,margins:{top:0,bottom:0,left:0,right:0},children:[gabTable]}),
     ]})]});
 
-    // ── QUESTÕES DOCX (mesma ordem: cabeçalho → distrator → imagem → consigna → enunciado → tipo) ──
     var qChildren=[new Paragraph({spacing:{before:200,after:0},children:[txt('')]})];
     questoes.forEach(function(q,i){
       var num=i+1;
       var numStr=String(num).padStart(2,'0');
       var pts=q.pts.toFixed(1).replace('.',',');
-
-      // 1. QUESTÃO XX (pts)
       qChildren.push(para([
         txt('QUESTÃO '+numStr+' ',{bold:true,size:22}),
         txt('('+pts+' pts)',{size:18,color:'555555'}),
       ],{before:160,after:60}));
-
-      // 2. Distrator
       if(q.distrator&&q.distrator.trim()){
         q.distrator.split('\n').forEach(function(line){
           qChildren.push(para([txt(line,{size:19,it:true,color:'444444'})],{before:40,after:0,indent:360}));
         });
         qChildren.push(new Paragraph({spacing:{before:40},children:[txt('')]}));
       }
-
-      // 3. Consigna
       if(q.consigna&&q.consigna.trim()){
         qChildren.push(para([txt(q.consigna,{size:19,it:true,color:'333333'})],{before:40,after:40}));
       }
-
-      // 4. Enunciado
       qChildren.push(para([txt(q.enunciado||'[sem enunciado]',{size:21})],{before:40,after:60}));
-
-      // 5. Tipo específico
       if(q.tipo==='multipla'){
         q.alternativas.forEach(function(a){
           if(!a.texto.trim())return;
@@ -948,7 +952,7 @@ async function exportDOCX(){
     alert('Erro ao gerar DOCX:\n'+err.message);
   }finally{
     var btn2=document.getElementById('btnDocx');
-    if(btn2){btn2.disabled=false;btn2.textContent='\uD83D\uDCDD Exportar DOCX';}
+    if(btn2){btn2.disabled=false;btn2.textContent='📝 Exportar DOCX';}
   }
 }
 </script>
