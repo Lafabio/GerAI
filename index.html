@@ -191,7 +191,7 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tx)
       <div class="fl"><label>Turma</label><input id="selTurma" placeholder="Ex: A, 9B…" oninput="autoSave()"></div>
       <div class="fl"><label>Trimestre</label>
         <select id="selTrim" onchange="autoSave()">
-          <option>1º Trimestre</option><option>2º Trimestre</option><option>3º Trimestre</option>
+          <option>1º</option><option>2º</option><option>3º</option>
         </select>
       </div>
     </div>
@@ -529,54 +529,243 @@ async function exportDOCX(){
       return `<w:tc><w:tcPr>${w}${span}${shade}${bdr}<w:vAlign w:val="${vAlign}"/>${m}</w:tcPr>${content}</w:tc>`;
     }
 
-    // ── GABARITO ──
-    const colNW=480, colLW=350;
-    const gabW=colNW+(letras.length+1)*colLW;
-    const cabW=9638-gabW;
-    const colWidthsGab=[colNW,...letras.map(()=>colLW),colLW].join(',');
+    // ══════════════════════════════════════════════════
+    // LARGURAS FIXAS
+    // 1cm = 567 twips | A4 útil com margem 1cm = 10772 twips
+    // gabW  = 4,00cm  = 2268 twips  (fixo)
+    // cabW  = 13,88cm = 7872 twips  (fixo)
+    // cLogo = 2,50cm  = 1418 twips  (fixo)
+    // gap entre tabelas = 10772 - 7872 - 2268 = 632 twips
+    // ══════════════════════════════════════════════════
 
-    let gabRows='';
+    // Gabarito: largura fixa 4cm = 2268 twips
+    const gabW  = 2268;
+    const gabCols = letras.length + 2; // Nº + letras + check
+    const colNW = Math.round(gabW * 0.22);
+    const colLW = Math.floor((gabW - colNW) / (letras.length + 1));
+
+    // Cabeçalho: largura fixa 14,00cm = 7938 twips (limite na marca 14cm da régua do Word)
+    const cabW  = 7938;
+
+    // Colunas internas do cabeçalho
+    const cLogo   = 1418;  // 2,5cm fixo
+    const cNlbl   = 320;   // célula N O T A
+    const cNbox   = 900;   // caixa da nota
+    const cCentro = cabW - cLogo - cNlbl - cNbox;
+
+    // ── Helpers de borda ──
+    const BDR_ON  = `<w:tcBorders><w:top w:val="single" w:sz="4" w:color="333333"/><w:left w:val="single" w:sz="4" w:color="333333"/><w:bottom w:val="single" w:sz="4" w:color="333333"/><w:right w:val="single" w:sz="4" w:color="333333"/></w:tcBorders>`;
+    const BDR_OFF = `<w:tcBorders><w:top w:val="none" w:sz="0" w:color="auto"/><w:left w:val="none" w:sz="0" w:color="auto"/><w:bottom w:val="none" w:sz="0" w:color="auto"/><w:right w:val="none" w:sz="0" w:color="auto"/></w:tcBorders>`;
+    const MAR     = `<w:tcMar><w:top w:w="50" w:type="dxa"/><w:left w:w="80" w:type="dxa"/><w:bottom w:w="50" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tcMar>`;
+    const MAR_SML = `<w:tcMar><w:top w:w="30" w:type="dxa"/><w:left w:w="60" w:type="dxa"/><w:bottom w:w="30" w:type="dxa"/><w:right w:w="60" w:type="dxa"/></w:tcMar>`;
+
+    function tc(w, content, opts){
+      opts = opts||{};
+      const ww   = `<w:tcW w:w="${w}" w:type="dxa"/>`;
+      const span = opts.span ? `<w:gridSpan w:val="${opts.span}"/>` : '';
+      const vm   = opts.vmStart ? `<w:vMerge w:val="restart"/>` : (opts.vmCont ? `<w:vMerge/>` : '');
+      const va   = `<w:vAlign w:val="${opts.va||'center'}"/>`;
+      const bdr  = opts.noBdr ? BDR_OFF : BDR_ON;
+      const mar  = opts.sml ? MAR_SML : MAR;
+      const inner = Array.isArray(content) ? content.join('') : (content||wPara(''));
+      return `<w:tc><w:tcPr>${ww}${span}${vm}${va}${bdr}${mar}</w:tcPr>${inner}</w:tc>`;
+    }
+
+    // Parágrafo com letras verticais para célula NOTA
+    function notaVert(){
+      return ['N','O','T','A'].map((c,i)=>
+        `<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="${i<3?40:0}"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>${c}</w:t></w:r></w:p>`
+      ).join('');
+    }
+
+    // ══════════════════════════════════════════════════
+    // TABELA CABEÇALHO
+    // Estrutura exata da imagem de referência:
+    //
+    // ┌──────────┬──────────────────────────┬──────┬────────┐
+    // │          │  NOME ESCOLA             │      │        │
+    // │  LOGO    │  Cidade                  │  N   │        │
+    // │  (r2)    │  TÍTULO AVALIAÇÃO        │  O   │  (r2)  │
+    // │          ├──────────────────────────┤  T   │        │
+    // │          │  Professor(a): Disc.:    │  A   │        │
+    // ├──────────┴──────────────────────────┴──────┴────────┤
+    // │  Aluno(a): ___  Série: ___ Turma: ___ Data: ___     │
+    // ├─────────────────────────────────────────────────────┤
+    // │  Assinatura: ___________________________  Data: ___ │
+    // ├─────────────────────────────────────────────────────┤
+    // │  Instruções em itálico                              │
+    // └─────────────────────────────────────────────────────┘
+    // ══════════════════════════════════════════════════
+
+    const tblGrid4 = `<w:tblGrid>
+      <w:gridCol w:w="${cLogo}"/>
+      <w:gridCol w:w="${cCentro}"/>
+      <w:gridCol w:w="${cNlbl}"/>
+      <w:gridCol w:w="${cNbox}"/>
+    </w:tblGrid>`;
+
+    const tblBdr = `<w:tblBorders>
+      <w:top    w:val="single" w:sz="6" w:color="333333"/>
+      <w:left   w:val="single" w:sz="6" w:color="333333"/>
+      <w:bottom w:val="single" w:sz="6" w:color="333333"/>
+      <w:right  w:val="single" w:sz="6" w:color="333333"/>
+      <w:insideH w:val="single" w:sz="4" w:color="333333"/>
+      <w:insideV w:val="single" w:sz="4" w:color="333333"/>
+    </w:tblBorders>`;
+
+    // ── Logo: gera XML de imagem inline ou placeholder ──
+    async function logoDrawingXml(){
+      if(!logoB64) return wPara('[ LOGO ]',{sz:16,center:true,color:'AAAAAA'});
+      const maxWemu = (cLogo - 120) * 635;
+      const maxHemu = 1800 * 635;
+      return new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => {
+          const ratio = img.naturalWidth / img.naturalHeight;
+          let emuW = maxWemu;
+          let emuH = Math.round(emuW / ratio);
+          if(emuH > maxHemu){ emuH = maxHemu; emuW = Math.round(emuH * ratio); }
+          const xml = `<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="0"/></w:pPr><w:r><w:rPr><w:noProof/></w:rPr><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><wp:extent cx="${emuW}" cy="${emuH}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="1" name="Logo"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="1" name="Logo"/><pic:cNvPicPr><a:picLocks noChangeAspect="1"/></pic:cNvPicPr></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdLogo" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${emuW}" cy="${emuH}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;
+          resolve(xml);
+        };
+        img.onerror = () => resolve(wPara('[ LOGO ]',{sz:16,center:true,color:'AAAAAA'}));
+        img.src = logoB64;
+      });
+    }
+    const logoXml = await logoDrawingXml();
+
+    // ── Linha 1: LOGO(vmStart) | título escola+cidade+avaliação | NOTA(vmStart) | box(vmStart) ──
+    const cab_r1 =
+      tc(cLogo,  logoXml, {vmStart:true, va:'center', sml:true}) +
+      tc(cCentro,[
+        wPara(escola, {bold:true, sz:32, center:true, spA:20}),
+        wPara(cidade, {sz:18, center:true, spA:20}),
+        wPara(titulo, {bold:true, sz:26, center:true}),
+      ], {va:'center', sml:true}) +
+      tc(cNlbl,  notaVert(), {vmStart:true, va:'center', sml:true}) +
+      tc(cNbox,  wPara(''), {vmStart:true, va:'center', sml:true});
+
+    // ── Linha 2: LOGO(vmCont) | Professor / Disciplina | NOTA(vmCont) | box(vmCont) ──
+    const cab_r2 =
+      tc(cLogo,  wPara(''), {vmCont:true, sml:true}) +
+      tc(cCentro,[
+        wParaRuns([{t:'Professor(a): ',bold:true,sz:18},{t:prof||'_______________________',sz:18}],{spB:20}),
+        wParaRuns([{t:'Disciplina: ',bold:true,sz:18},{t:disc||'___________________',sz:18}]),
+      ], {va:'center', sml:true}) +
+      tc(cNlbl,  wPara(''), {vmCont:true, sml:true}) +
+      tc(cNbox,  wPara(''), {vmCont:true, sml:true});
+
+    // ── Linha 3: span total | Aluno / Série / Turma / Trim / Data ──
+    const cab_r3 =
+      tc(cabW,
+        wParaRuns([
+          {t:'Aluno(a): ',bold:true,sz:18},{t:'__________________________________  ',sz:18},
+          {t:'Série: ',bold:true,sz:18},{t:serie+'  ',sz:18},
+          {t:'Turma: ',bold:true,sz:18},{t:(turma||'___')+'  ',sz:18},
+          {t:'Trim.: ',bold:true,sz:18},{t:trimVal+'  ',sz:18},
+          {t:'Data: ',bold:true,sz:18},{t:dataFmt,sz:18},
+        ]),
+      {span:4, va:'center', sml:true});
+
+    // ── Linha 4: span total | Assinatura + Data ──
+    const cab_r4 =
+      tc(cabW,
+        wParaRuns([
+          {t:'Assinatura do responsável: ',bold:true,sz:18},
+          {t:'_______________________   ',sz:18},
+          {t:'Data: ',bold:true,sz:18},{t:'___/___/___',sz:18},
+        ]),
+      {span:4, va:'center', sml:true});
+
+    // ── Linha 5: span total | Instruções ──
+    const cab_r5 =
+      tc(cabW, wPara(instrText,{sz:17,it:true}), {span:4, va:'top', sml:true});
+
+    const cabTable = `<w:tbl>
+      <w:tblPr>
+        <w:tblW w:w="${cabW}" w:type="dxa"/>
+        ${tblBdr}
+        <w:tblLayout w:type="fixed"/>
+      </w:tblPr>
+      ${tblGrid4}
+      <w:tr><w:trPr><w:trHeight w:val="800" w:hRule="atLeast"/></w:trPr>${cab_r1}</w:tr>
+      <w:tr>${cab_r2}</w:tr>
+      <w:tr>${cab_r3}</w:tr>
+      <w:tr>${cab_r4}</w:tr>
+      <w:tr>${cab_r5}</w:tr>
+    </w:tbl>`;
+
+    // ══════════════════════════════════════════════════
+    // TABELA GABARITO
+    // ══════════════════════════════════════════════════
+    const gabBdr = `<w:tblBorders>
+      <w:top    w:val="single" w:sz="6" w:color="333333"/>
+      <w:left   w:val="single" w:sz="6" w:color="333333"/>
+      <w:bottom w:val="single" w:sz="6" w:color="333333"/>
+      <w:right  w:val="single" w:sz="6" w:color="333333"/>
+      <w:insideH w:val="single" w:sz="4" w:color="333333"/>
+      <w:insideV w:val="single" w:sz="4" w:color="333333"/>
+    </w:tblBorders>`;
+    const gabGrid = `<w:tblGrid>${[colNW,...letras.map(()=>colLW),colLW].map(cw=>`<w:gridCol w:w="${cw}"/>`).join('')}</w:tblGrid>`;
+
     // Header
-    let gabHdr=wCell(wPara('Nº',{bold:true,sz:16,center:true}),{w:colNW,shade:'E8E8E8'});
-    letras.forEach(l=>{ gabHdr+=wCell(wPara(l,{bold:true,sz:16,center:true}),{w:colLW,shade:'E8E8E8'}); });
-    gabHdr+=wCell(wPara('✓',{bold:true,sz:14,center:true}),{w:colLW,shade:'E8E8E8'});
-    gabRows+=`<w:tr>${gabHdr}</w:tr>`;
+    let gabHdrCells = tc(colNW, wPara('Nº',{bold:true,sz:16,center:true}), {shade:'E8E8E8',sml:true});
+    letras.forEach(l=>{ gabHdrCells += tc(colLW, wPara(l,{bold:true,sz:16,center:true}), {sml:true}); });
+    gabHdrCells += tc(colLW, wPara('✓',{bold:true,sz:14,center:true}), {sml:true});
+    let gabRows = `<w:tr>${gabHdrCells}</w:tr>`;
 
     questoes.forEach((q,i)=>{
-      const shade=i%2===0?'F5F5F5':'FFFFFF';
-      const correta=q.tipo==='multipla'?q.alternativas.find(a=>a.correta):null;
-      let row=wCell(wPara(String(i+1),{bold:true,sz:16,center:true}),{w:colNW,shade});
+      const shade = i%2===0 ? 'F5F5F5' : 'FFFFFF';
+      const correta = q.tipo==='multipla' ? q.alternativas.find(a=>a.correta) : null;
+      let row = tc(colNW, wPara(String(i+1),{bold:true,sz:16,center:true}), {sml:true});
       if(q.tipo==='discursiva'){
-        row+=wCell(wPara('Discursiva',{sz:13,it:true,center:true}),{span:letras.length+1,shade});
+        row += tc(colLW*(letras.length+1), wPara('Discursiva',{sz:13,it:true,center:true}), {span:letras.length+1,sml:true});
       } else if(q.tipo==='somatoria'){
         const soma=q.somatoria.filter(s=>s.ok).reduce((a,s)=>a+s.v,0);
-        row+=wCell(wPara('= '+(soma||'—'),{bold:true,sz:14,center:true}),{span:letras.length+1,shade});
+        row += tc(colLW*(letras.length+1), wPara('= '+(soma||'—'),{bold:true,sz:14,center:true}), {span:letras.length+1,sml:true});
       } else {
         letras.forEach(l=>{
-          const isOk=correta&&correta.letra===l;
-          row+=wCell(wPara(l,{bold:isOk,sz:16,center:true,color:isOk?'166534':undefined}),{w:colLW,shade});
+          const isOk = correta&&correta.letra===l;
+          row += tc(colLW, wPara(l,{bold:isOk,sz:16,center:true,color:isOk?'166534':undefined}), {sml:true});
         });
-        row+=wCell(wPara(''),{w:colLW,shade});
+        row += tc(colLW, wPara(''), {sml:true});
       }
-      gabRows+=`<w:tr>${row}</w:tr>`;
+      gabRows += `<w:tr>${row}</w:tr>`;
     });
 
-    const gabTable=`<w:tbl><w:tblPr><w:tblW w:w="${gabW}" w:type="dxa"/><w:tblBorders><w:insideH w:val="single" w:sz="4" w:color="333333"/><w:insideV w:val="single" w:sz="4" w:color="333333"/></w:tblBorders></w:tblPr><w:tblGrid>${[colNW,...letras.map(()=>colLW),colLW].map(w=>`<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>${gabRows}</w:tbl>`;
+    const gabTable = `<w:tbl>
+      <w:tblPr>
+        <w:tblW w:w="${gabW}" w:type="dxa"/>
+        ${gabBdr}
+        <w:tblLayout w:type="fixed"/>
+      </w:tblPr>
+      ${gabGrid}
+      ${gabRows}
+    </w:tbl>`;
 
-    // ── CABEÇALHO ──
-    const cabContent=
-      wPara(escola,{bold:true,sz:26,center:true,spA:40})+
-      wPara(cidade,{sz:18,center:true,spA:40})+
-      wPara(titulo,{bold:true,sz:24,center:true,spA:60})+
-      wParaRuns([{t:'Professor(a): ',bold:true,sz:19},{t:prof||'________________________',sz:19},{t:'    Disciplina: ',bold:true,sz:19},{t:disc||'____________',sz:19}],{spA:30})+
-      wParaRuns([{t:'Aluno(a): _________________________________  ',sz:19},{t:'Série: ',bold:true,sz:19},{t:serie+'  ',sz:19},{t:'Turma: ',bold:true,sz:19},{t:(turma||'___')+'  ',sz:19},{t:'Trim.: ',bold:true,sz:19},{t:trimVal+'  ',sz:19},{t:'Data: ',bold:true,sz:19},{t:dataFmt,sz:19}],{spA:30})+
-      wPara('Assinatura do responsável: _______________________   Data: ___/___/___',{sz:19,spA:30})+
-      wPara(instrText,{sz:18,it:true});
+    // ══════════════════════════════════════════════════
+    // WRAPPER: cabeçalho + gabarito lado a lado
+    // ══════════════════════════════════════════════════
+    // Posicionamento absoluto:
+    // cabW = 7938 twips começa em x=0 (relativo à margem)
+    // gabW = 2268 twips começa em x = 7938 + 284 (0,5cm) = 8222 twips
+    const cabPos = 0;
+    const gabPos = 7938 + 284; // 8222 twips
 
-    const cabTable=`<w:tbl><w:tblPr><w:tblW w:w="${cabW}" w:type="dxa"/><w:tblBorders><w:top w:val="single" w:sz="4" w:color="333333"/><w:left w:val="single" w:sz="4" w:color="333333"/><w:bottom w:val="single" w:sz="4" w:color="333333"/><w:right w:val="single" w:sz="4" w:color="333333"/><w:insideH w:val="single" w:sz="4" w:color="333333"/><w:insideV w:val="single" w:sz="4" w:color="333333"/></w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="${cabW}"/></w:tblGrid><w:tr>${wCell(cabContent,{w:cabW})}</w:tr></w:tbl>`;
+    // Tabela cabeçalho posicionada à esquerda — nivelada pelo topo da margem
+    const cabTablePos = cabTable.replace(
+      '<w:tblPr>',
+      `<w:tblPr><w:tblpPr w:leftFromText="0" w:rightFromText="0" w:vertAnchor="margin" w:horzAnchor="margin" w:tblpX="${cabPos}" w:tblpY="0"/>`
+    );
 
-    // Tabela wrapper (cabeçalho | gabarito)
-    const wrapTable=`<w:tbl><w:tblPr><w:tblW w:w="9638" w:type="dxa"/><w:tblBorders><w:top w:val="none"/><w:left w:val="none"/><w:bottom w:val="none"/><w:right w:val="none"/><w:insideH w:val="none"/><w:insideV w:val="none"/></w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="${cabW}"/><w:gridCol w:w="${gabW}"/></w:tblGrid><w:tr>${wCell(cabTable,{w:cabW,noBorder:true,vAlign:'top'})}${wCell(gabTable,{w:gabW,noBorder:true,vAlign:'top'})}</w:tr></w:tbl>`;
+    // Tabela gabarito posicionada após o cabeçalho com gap de 0,5cm — nivelada pelo topo da margem
+    const gabTablePos = gabTable.replace(
+      '<w:tblPr>',
+      `<w:tblPr><w:tblpPr w:leftFromText="0" w:rightFromText="0" w:vertAnchor="margin" w:horzAnchor="margin" w:tblpX="${gabPos}" w:tblpY="0"/>`
+    );
+
+    // Parágrafo âncora que contém ambas as tabelas flutuantes
+    const wrapTable = cabTablePos + '<w:p><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr></w:p>' + gabTablePos;
 
     // ── QUESTÕES ──
     let qsXml='<w:p><w:pPr><w:spacing w:before="200" w:after="0"/></w:pPr></w:p>';
@@ -637,7 +826,7 @@ async function exportDOCX(){
     ${qsXml}
     <w:sectPr>
       <w:pgSz w:w="11906" w:h="16838"/>
-      <w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="709" w:footer="709" w:gutter="0"/>
+      <w:pgMar w:top="567" w:right="567" w:bottom="567" w:left="567" w:header="0" w:footer="0" w:gutter="0"/>
     </w:sectPr>
   </w:body>
 </w:document>`;
@@ -650,6 +839,11 @@ async function exportDOCX(){
   <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
   <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
   <Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>
+  <Default Extension="png" ContentType="image/png"/>
+  <Default Extension="jpg" ContentType="image/jpeg"/>
+  <Default Extension="jpeg" ContentType="image/jpeg"/>
+  <Default Extension="gif" ContentType="image/gif"/>
+  <Default Extension="webp" ContentType="image/webp"/>
 </Types>`;
 
     const rels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -657,10 +851,13 @@ async function exportDOCX(){
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
 </Relationships>`;
 
+    let logoExt = 'png';
+    if(logoB64){ logoExt = (logoB64.match(/^data:image\/([^;]+);/)?.[1]||'png').replace('jpeg','jpg'); }
     const wordRels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
   <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>
+${logoB64 ? '<Relationship Id="rIdLogo" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/logo.' + logoExt + '"/>' : ''}
 </Relationships>`;
 
     const stylesXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -691,6 +888,12 @@ async function exportDOCX(){
     zip.file('word/_rels/document.xml.rels', wordRels);
     zip.file('word/styles.xml', stylesXml);
     zip.file('word/settings.xml', settingsXml);
+    if(logoB64){
+      const logoMime = logoB64.match(/^data:([^;]+);/)?.[1]||'image/png';
+      logoExt = logoMime.includes('jpeg')||logoMime.includes('jpg') ? 'jpg' : logoMime.includes('gif') ? 'gif' : logoMime.includes('webp') ? 'webp' : 'png';
+      const logoPure = logoB64.split(',')[1];
+      zip.file('word/media/logo.'+logoExt, logoPure, {base64:true});
+    }
 
     const blob=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',compression:'DEFLATE',compressionOptions:{level:6}});
     const url=URL.createObjectURL(blob);
