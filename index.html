@@ -199,7 +199,7 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tx)
     </div>
     <div class="fl"><label>Data da Prova</label>
       <div class="cal-wrap">
-        <button type="button" class="cal-btn" id="calBtn" onclick="toggleCal()">Selecionar data…</button>
+        <button type="button" class="cal-btn" id="calBtn" onclick="toggleCal(event)">Selecionar data…</button>
         <div class="cal-pop" id="calPop">
           <div class="cal-nav">
             <button onclick="calNav(-1)">‹</button>
@@ -323,7 +323,7 @@ function renderDiscSelect(){ const sel=document.getElementById('selDisc'); const
 
 const MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const DIAS=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
-function toggleCal(){ document.getElementById('calPop').classList.toggle('open'); }
+function toggleCal(e){ if(e) e.stopPropagation(); document.getElementById('calPop').classList.toggle('open'); }
 function calNav(d){ calMonth+=d; if(calMonth>11){calMonth=0;calYear++;}else if(calMonth<0){calMonth=11;calYear--;} renderCal(); }
 function renderCal(){
   document.getElementById('calTitle').textContent=`${MESES[calMonth]} ${calYear}`;
