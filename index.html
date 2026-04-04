@@ -402,10 +402,14 @@ function updatePts(){
 }
 function resetAll(){ if(!confirm('Apagar tudo e recomeçar?'))return; questoes=[];qId=0; document.getElementById('qContainer').innerHTML=''; for(let i=0;i<10;i++) addQ(i<2?'discursiva':'multipla'); updatePts(); }
 function autoSave(){ try{sessionStorage.setItem('gp_e',document.getElementById('nomeEscola').value);}catch(e){} }
-function openPreview(){ document.getElementById('modalBd').innerHTML=buildHTML(); document.getElementById('modalPreview').classList.remove('hidden'); }
+function openPreview(){ document.getElementById('modalBd').innerHTML=buildHTML(questoes,null); document.getElementById('modalPreview').classList.remove('hidden'); }
 function closePreview(){ document.getElementById('modalPreview').classList.add('hidden'); }
 
-function buildHTML(){
+// ══════════════════════════════════════════════════════════════
+// BUILD HTML — recebe _questoes e _versaoLabel como parâmetros
+// Usado tanto para preview/export normal quanto para versões embaralhadas
+// ══════════════════════════════════════════════════════════════
+function buildHTML(_questoes, _versaoLabel){
   const escola=document.getElementById('nomeEscola').value,cidade=document.getElementById('cidadeEscola').value;
   const titulo=document.getElementById('tituloAval').value,prof=document.getElementById('selProf').value;
   const disc=document.getElementById('selDisc').value,serie=document.getElementById('selSerie').value;
@@ -413,8 +417,11 @@ function buildHTML(){
   const instrucoes=document.getElementById('instrucoes').value;
   const dataStr=document.getElementById('calBtn').textContent.trim();
   const letras=tipoProva==='em'?[...LEM]:[...LEF];
+  const tituloFinal = _versaoLabel ? `${titulo} — VERSÃO ${_versaoLabel}` : titulo;
+
+  // ── GABARITO: usa _questoes (já embaralhado) ──
   let gabHtml=`<table style="width:152px;border-collapse:collapse;border:1.5px solid #333;font-family:Arial,sans-serif;font-size:8.5pt;float:right;margin-left:8px;"><tr style="background:#e8e8e8;"><th style="border:1px solid #333;padding:3px 5px;text-align:center;">Nº</th><th style="border:1px solid #333;padding:3px 5px;text-align:center;" colspan="${letras.length+1}">Gabarito</th></tr>`;
-  questoes.forEach((q,i)=>{
+  _questoes.forEach((q,i)=>{
     const correta=q.tipo==='multipla'?q.alternativas.find(a=>a.correta):null;
     gabHtml+=`<tr style="background:${i%2===0?'#f9f9f9':'#fff'}"><td style="border:1px solid #333;padding:2px 5px;text-align:center;font-weight:bold;">${i+1}</td>`;
     if(q.tipo==='discursiva') gabHtml+=`<td style="border:1px solid #333;padding:2px 4px;text-align:center;font-size:7.5pt;" colspan="${letras.length+1}">Discursiva</td>`;
@@ -423,10 +430,13 @@ function buildHTML(){
     gabHtml+=`</tr>`;
   });
   gabHtml+=`</table>`;
+
   const logoHtml=logoB64?`<img src="${logoB64}" style="max-width:85px;max-height:65px;object-fit:contain;">`:`<div style="width:85px;height:65px;border:1px dashed #ccc;display:flex;align-items:center;justify-content:center;font-size:8px;color:#aaa;">Logo</div>`;
-  const wrap=`<div style="overflow:hidden;font-family:Arial,sans-serif;margin-bottom:14px;">${gabHtml}<table style="border-collapse:collapse;border:1.5px solid #333;font-family:Arial,sans-serif;font-size:9pt;width:calc(100% - 160px);"><tr><td rowspan="5" style="border:1px solid #333;width:95px;text-align:center;vertical-align:middle;padding:5px;">${logoHtml}</td><td colspan="3" style="border:1px solid #333;text-align:center;vertical-align:middle;padding:4px 6px;"><div style="font-size:12.5pt;font-weight:bold;">${escola}</div><div style="font-size:9.5pt;">${cidade}</div><div style="font-size:11.5pt;font-weight:bold;">${titulo}</div></td><td rowspan="5" style="border:1px solid #333;width:20px;text-align:center;vertical-align:middle;font-size:9pt;font-weight:bold;writing-mode:vertical-rl;padding:4px;">N&nbsp;O&nbsp;T&nbsp;A</td><td rowspan="5" style="border:1px solid #333;width:72px;"></td></tr><tr><td colspan="2" style="border:1px solid #333;padding:3px 6px;font-size:8.5pt;">Professor(a): <u>${prof||'______________________________'}</u></td><td style="border:1px solid #333;padding:3px 6px;font-size:8.5pt;">Disciplina: <u>${disc||'_______________'}</u></td></tr><tr><td colspan="3" style="border:1px solid #333;padding:3px 6px;font-size:8.5pt;">Aluno(a): _____________________________ Série: <u>${serie}</u> Turma: <u>${turma||'___'}</u> Trimestre: <u>${trim}</u> Data: <u>${dataStr==='Selecionar data…'?'___/___/____':dataStr}</u></td></tr><tr><td colspan="3" style="border:1px solid #333;padding:3px 6px;font-size:8.5pt;">Assinatura do responsável: __________________________ Data: ___/___/___</td></tr><tr><td colspan="3" style="border:1px solid #333;padding:4px 6px;font-size:8.5pt;">${instrucoes}</td></tr></table></div>`;
+  const wrap=`<div style="overflow:hidden;font-family:Arial,sans-serif;margin-bottom:14px;">${gabHtml}<table style="border-collapse:collapse;border:1.5px solid #333;font-family:Arial,sans-serif;font-size:9pt;width:calc(100% - 160px);"><tr><td rowspan="5" style="border:1px solid #333;width:95px;text-align:center;vertical-align:middle;padding:5px;">${logoHtml}</td><td colspan="3" style="border:1px solid #333;text-align:center;vertical-align:middle;padding:4px 6px;"><div style="font-size:12.5pt;font-weight:bold;">${escola}</div><div style="font-size:9.5pt;">${cidade}</div><div style="font-size:11.5pt;font-weight:bold;">${tituloFinal}</div></td><td rowspan="5" style="border:1px solid #333;width:20px;text-align:center;vertical-align:middle;font-size:9pt;font-weight:bold;writing-mode:vertical-rl;padding:4px;">N&nbsp;O&nbsp;T&nbsp;A</td><td rowspan="5" style="border:1px solid #333;width:72px;"></td></tr><tr><td colspan="2" style="border:1px solid #333;padding:3px 6px;font-size:8.5pt;">Professor(a): <u>${prof||'______________________________'}</u></td><td style="border:1px solid #333;padding:3px 6px;font-size:8.5pt;">Disciplina: <u>${disc||'_______________'}</u></td></tr><tr><td colspan="3" style="border:1px solid #333;padding:3px 6px;font-size:8.5pt;">Aluno(a): _____________________________ Série: <u>${serie}</u> Turma: <u>${turma||'___'}</u> Trimestre: <u>${trim}</u> Data: <u>${dataStr==='Selecionar data…'?'___/___/____':dataStr}</u></td></tr><tr><td colspan="3" style="border:1px solid #333;padding:3px 6px;font-size:8.5pt;">Assinatura do responsável: __________________________ Data: ___/___/___</td></tr><tr><td colspan="3" style="border:1px solid #333;padding:4px 6px;font-size:8.5pt;">${instrucoes}</td></tr></table></div>`;
+
+  // ── QUESTÕES: usa _questoes (já embaralhado) ──
   let qsHtml='';
-  questoes.forEach((q,i)=>{
+  _questoes.forEach((q,i)=>{
     const numStr=String(i+1).padStart(2,'0'),pts=q.pts.toFixed(1).replace('.',',');
     qsHtml+=`<div style="margin-bottom:20px;font-family:Arial,sans-serif;font-size:11pt;page-break-inside:avoid;"><div style="font-weight:bold;font-size:11.5pt;margin-bottom:6px;">QUESTÃO ${numStr} <span style="font-size:10pt;font-weight:normal;">(${pts} pts)</span></div>`;
     if(q.distrator&&q.distrator.trim()) qsHtml+=`<div style="border-left:3px solid #bbb;padding:5px 12px;margin-bottom:8px;font-style:italic;font-size:10.5pt;background:#fafafa;">${q.distrator.replace(/\n/g,'<br>')}</div>`;
@@ -448,7 +458,7 @@ async function exportPDF(){
   try{
     const d=document.createElement('div');
     d.style.cssText='position:absolute;left:-9999px;top:0;width:190mm;padding:10mm;background:white;';
-    d.innerHTML=buildHTML(); document.body.appendChild(d);
+    d.innerHTML=buildHTML(questoes,null); document.body.appendChild(d);
     await Promise.all(Array.from(d.querySelectorAll('img')).map(img=>img.complete?Promise.resolve():new Promise(r=>{img.onload=r;img.onerror=r;})));
     const canvas=await html2canvas(d,{scale:2,backgroundColor:'#ffffff',logging:false,useCORS:true});
     document.body.removeChild(d);
@@ -465,7 +475,9 @@ async function exportPDF(){
 }
 
 // ══════════════════════════════════════════════════════════════
-// EXPORT DOCX — usa JSZip (já carregado via cdnjs) + XML manual
+// EXPORT DOCX — usa JSZip + XML manual
+// _questoes: array de questões já na ordem/alternativas corretas para esta versão
+// _versaoLabel: 'A', 'B', etc., ou null para exportação normal
 // ══════════════════════════════════════════════════════════════
 async function exportDOCX(){
   const btn=document.getElementById('btnDocx');
@@ -498,11 +510,11 @@ async function buildAndDownloadDocx(_questoes, _versaoLabel){
     const instrText=document.getElementById('instrucoes').value||'';
     const dataStr=document.getElementById('calBtn').textContent.trim();
     const dataFmt=dataStr==='Selecionar data…'?'___/___/____':dataStr;
+    // letras de acordo com o tipo de prova
     const letras=tipoProva==='em'?['A','B','C','D','E']:['A','B','C','D'];
 
     // Helpers XML
     const x=xmlEsc;
-    function twips(pt){return Math.round(pt*20);}
 
     // Parágrafo simples
     function wPara(text,opts){
@@ -536,43 +548,19 @@ async function buildAndDownloadDocx(_questoes, _versaoLabel){
       return `<w:p><w:pPr>${jc}<w:spacing w:before="${spB}" w:after="${spA}"/>${ind}${border}</w:pPr>${runsXml}</w:p>`;
     }
 
-    // Célula de tabela
-    function wCell(content,opts){
-      opts=opts||{};
-      const w=opts.w?`<w:tcW w:w="${opts.w}" w:type="dxa"/>`:'';
-      const span=opts.span?`<w:gridSpan w:val="${opts.span}"/>`:'';
-      const vAlign=opts.vAlign||'center';
-      const shade=opts.shade?`<w:shd w:val="clear" w:color="auto" w:fill="${opts.shade}"/>`:'';
-      const bdr=opts.noBorder?`<w:tcBorders><w:top w:val="none"/><w:left w:val="none"/><w:bottom w:val="none"/><w:right w:val="none"/></w:tcBorders>`:`<w:tcBorders><w:top w:val="single" w:sz="4" w:color="333333"/><w:left w:val="single" w:sz="4" w:color="333333"/><w:bottom w:val="single" w:sz="4" w:color="333333"/><w:right w:val="single" w:sz="4" w:color="333333"/></w:tcBorders>`;
-      const m=opts.noBorder?'<w:tcMar><w:top w:w="0" w:type="dxa"/><w:left w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="60" w:type="dxa"/></w:tcMar>':'<w:tcMar><w:top w:w="60" w:type="dxa"/><w:left w:w="80" w:type="dxa"/><w:bottom w:w="60" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tcMar>';
-      return `<w:tc><w:tcPr>${w}${span}${shade}${bdr}<w:vAlign w:val="${vAlign}"/>${m}</w:tcPr>${content}</w:tc>`;
-    }
-
     // ══════════════════════════════════════════════════
     // LARGURAS FIXAS
-    // 1cm = 567 twips | A4 útil com margem 1cm = 10772 twips
-    // gabW  = 4,00cm  = 2268 twips  (fixo)
-    // cabW  = 13,88cm = 7872 twips  (fixo)
-    // cLogo = 2,50cm  = 1418 twips  (fixo)
-    // gap entre tabelas = 10772 - 7872 - 2268 = 632 twips
     // ══════════════════════════════════════════════════
-
-    // Gabarito: largura fixa 4cm = 2268 twips
     const gabW  = 2268;
-    const gabCols = letras.length + 2; // Nº + letras + check
     const colNW = Math.round(gabW * 0.22);
     const colLW = Math.floor((gabW - colNW) / (letras.length + 1));
 
-    // Cabeçalho: largura fixa 14,00cm = 7938 twips (limite na marca 14cm da régua do Word)
     const cabW  = 7938;
-
-    // Colunas internas do cabeçalho
-    const cLogo   = 1418;  // 2,5cm fixo
-    const cNlbl   = 320;   // célula N O T A
-    const cNbox   = 900;   // caixa da nota
+    const cLogo   = 1418;
+    const cNlbl   = 320;
+    const cNbox   = 900;
     const cCentro = cabW - cLogo - cNlbl - cNbox;
 
-    // ── Helpers de borda ──
     const BDR_ON  = `<w:tcBorders><w:top w:val="single" w:sz="4" w:color="333333"/><w:left w:val="single" w:sz="4" w:color="333333"/><w:bottom w:val="single" w:sz="4" w:color="333333"/><w:right w:val="single" w:sz="4" w:color="333333"/></w:tcBorders>`;
     const BDR_OFF = `<w:tcBorders><w:top w:val="none" w:sz="0" w:color="auto"/><w:left w:val="none" w:sz="0" w:color="auto"/><w:bottom w:val="none" w:sz="0" w:color="auto"/><w:right w:val="none" w:sz="0" w:color="auto"/></w:tcBorders>`;
     const MAR     = `<w:tcMar><w:top w:w="50" w:type="dxa"/><w:left w:w="80" w:type="dxa"/><w:bottom w:w="50" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tcMar>`;
@@ -590,49 +578,12 @@ async function buildAndDownloadDocx(_questoes, _versaoLabel){
       return `<w:tc><w:tcPr>${ww}${span}${vm}${va}${bdr}${mar}</w:tcPr>${inner}</w:tc>`;
     }
 
-    // Parágrafo com letras verticais para célula NOTA
     function notaVert(){
       return ['N','O','T','A'].map((c,i)=>
         `<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="${i<3?40:0}"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>${c}</w:t></w:r></w:p>`
       ).join('');
     }
 
-    // ══════════════════════════════════════════════════
-    // TABELA CABEÇALHO
-    // Estrutura exata da imagem de referência:
-    //
-    // ┌──────────┬──────────────────────────┬──────┬────────┐
-    // │          │  NOME ESCOLA             │      │        │
-    // │  LOGO    │  Cidade                  │  N   │        │
-    // │  (r2)    │  TÍTULO AVALIAÇÃO        │  O   │  (r2)  │
-    // │          ├──────────────────────────┤  T   │        │
-    // │          │  Professor(a): Disc.:    │  A   │        │
-    // ├──────────┴──────────────────────────┴──────┴────────┤
-    // │  Aluno(a): ___  Série: ___ Turma: ___ Data: ___     │
-    // ├─────────────────────────────────────────────────────┤
-    // │  Assinatura: ___________________________  Data: ___ │
-    // ├─────────────────────────────────────────────────────┤
-    // │  Instruções em itálico                              │
-    // └─────────────────────────────────────────────────────┘
-    // ══════════════════════════════════════════════════
-
-    const tblGrid4 = `<w:tblGrid>
-      <w:gridCol w:w="${cLogo}"/>
-      <w:gridCol w:w="${cCentro}"/>
-      <w:gridCol w:w="${cNlbl}"/>
-      <w:gridCol w:w="${cNbox}"/>
-    </w:tblGrid>`;
-
-    const tblBdr = `<w:tblBorders>
-      <w:top    w:val="single" w:sz="6" w:color="333333"/>
-      <w:left   w:val="single" w:sz="6" w:color="333333"/>
-      <w:bottom w:val="single" w:sz="6" w:color="333333"/>
-      <w:right  w:val="single" w:sz="6" w:color="333333"/>
-      <w:insideH w:val="single" w:sz="4" w:color="333333"/>
-      <w:insideV w:val="single" w:sz="4" w:color="333333"/>
-    </w:tblBorders>`;
-
-    // ── Logo: gera XML de imagem inline ou placeholder ──
     async function logoDrawingXml(){
       if(!logoB64) return wPara('[ LOGO ]',{sz:16,center:true,color:'AAAAAA'});
       const maxWemu = (cLogo - 120) * 635;
@@ -653,18 +604,35 @@ async function buildAndDownloadDocx(_questoes, _versaoLabel){
     }
     const logoXml = await logoDrawingXml();
 
-    // ── Linha 1: LOGO(vmStart) | título escola+cidade+avaliação | NOTA(vmStart) | box(vmStart) ──
+    const tblGrid4 = `<w:tblGrid>
+      <w:gridCol w:w="${cLogo}"/>
+      <w:gridCol w:w="${cCentro}"/>
+      <w:gridCol w:w="${cNlbl}"/>
+      <w:gridCol w:w="${cNbox}"/>
+    </w:tblGrid>`;
+
+    const tblBdr = `<w:tblBorders>
+      <w:top    w:val="single" w:sz="6" w:color="333333"/>
+      <w:left   w:val="single" w:sz="6" w:color="333333"/>
+      <w:bottom w:val="single" w:sz="6" w:color="333333"/>
+      <w:right  w:val="single" w:sz="6" w:color="333333"/>
+      <w:insideH w:val="single" w:sz="4" w:color="333333"/>
+      <w:insideV w:val="single" w:sz="4" w:color="333333"/>
+    </w:tblBorders>`;
+
+    // Título com versão se aplicável
+    const tituloDocx = _versaoLabel ? `${titulo} — VERSÃO ${_versaoLabel}` : titulo;
+
     const cab_r1 =
       tc(cLogo,  logoXml, {vmStart:true, va:'center', sml:true}) +
       tc(cCentro,[
         wPara(escola, {bold:true, sz:32, center:true, spA:20}),
         wPara(cidade, {sz:18, center:true, spA:20}),
-        wPara(titulo + (_versaoLabel ? '  —  VERSÃO '+_versaoLabel : ''), {bold:true, sz:26, center:true}),
+        wPara(tituloDocx, {bold:true, sz:26, center:true}),
       ], {va:'center', sml:true}) +
       tc(cNlbl,  notaVert(), {vmStart:true, va:'center', sml:true}) +
       tc(cNbox,  wPara(''), {vmStart:true, va:'center', sml:true});
 
-    // ── Linha 2: LOGO(vmCont) | Professor / Disciplina | NOTA(vmCont) | box(vmCont) ──
     const cab_r2 =
       tc(cLogo,  wPara(''), {vmCont:true, sml:true}) +
       tc(cCentro,[
@@ -674,7 +642,6 @@ async function buildAndDownloadDocx(_questoes, _versaoLabel){
       tc(cNlbl,  wPara(''), {vmCont:true, sml:true}) +
       tc(cNbox,  wPara(''), {vmCont:true, sml:true});
 
-    // ── Linha 3: span total | Aluno / Série / Turma / Trim / Data ──
     const cab_r3 =
       tc(cabW,
         wParaRuns([
@@ -686,7 +653,6 @@ async function buildAndDownloadDocx(_questoes, _versaoLabel){
         ]),
       {span:4, va:'center', sml:true});
 
-    // ── Linha 4: span total | Assinatura + Data ──
     const cab_r4 =
       tc(cabW,
         wParaRuns([
@@ -696,7 +662,6 @@ async function buildAndDownloadDocx(_questoes, _versaoLabel){
         ]),
       {span:4, va:'center', sml:true});
 
-    // ── Linha 5: span total | Instruções ──
     const cab_r5 =
       tc(cabW, wPara(instrText,{sz:17,it:true}), {span:4, va:'top', sml:true});
 
@@ -715,7 +680,7 @@ async function buildAndDownloadDocx(_questoes, _versaoLabel){
     </w:tbl>`;
 
     // ══════════════════════════════════════════════════
-    // TABELA GABARITO
+    // TABELA GABARITO — usa _questoes (já embaralhado)
     // ══════════════════════════════════════════════════
     const gabBdr = `<w:tblBorders>
       <w:top    w:val="single" w:sz="6" w:color="333333"/>
@@ -727,14 +692,16 @@ async function buildAndDownloadDocx(_questoes, _versaoLabel){
     </w:tblBorders>`;
     const gabGrid = `<w:tblGrid>${[colNW,...letras.map(()=>colLW),colLW].map(cw=>`<w:gridCol w:w="${cw}"/>`).join('')}</w:tblGrid>`;
 
-    // Header
+    // Header do gabarito
     let gabHdrCells = tc(colNW, wPara('Nº',{bold:true,sz:16,center:true}), {shade:'E8E8E8',sml:true});
     letras.forEach(l=>{ gabHdrCells += tc(colLW, wPara(l,{bold:true,sz:16,center:true}), {sml:true}); });
     gabHdrCells += tc(colLW, wPara('✓',{bold:true,sz:14,center:true}), {sml:true});
     let gabRows = `<w:tr>${gabHdrCells}</w:tr>`;
 
-    questoes.forEach((q,i)=>{
+    // ── PONTO CRÍTICO: itera sobre _questoes, não sobre a global questoes ──
+    _questoes.forEach((q,i)=>{
       const shade = i%2===0 ? 'F5F5F5' : 'FFFFFF';
+      // Busca a alternativa correta na posição atual (após embaralhamento)
       const correta = q.tipo==='multipla' ? q.alternativas.find(a=>a.correta) : null;
       let row = tc(colNW, wPara(String(i+1),{bold:true,sz:16,center:true}), {sml:true});
       if(q.tipo==='discursiva'){
@@ -743,8 +710,9 @@ async function buildAndDownloadDocx(_questoes, _versaoLabel){
         const soma=q.somatoria.filter(s=>s.ok).reduce((a,s)=>a+s.v,0);
         row += tc(colLW*(letras.length+1), wPara('= '+(soma||'—'),{bold:true,sz:14,center:true}), {span:letras.length+1,sml:true});
       } else {
+        // Para múltipla escolha: destaca a letra correta na POSIÇÃO atual das alternativas
         letras.forEach(l=>{
-          const isOk = correta&&correta.letra===l;
+          const isOk = correta && correta.letra===l;
           row += tc(colLW, wPara(l,{bold:isOk,sz:16,center:true,color:isOk?'166534':undefined}), {sml:true});
         });
         row += tc(colLW, wPara(''), {sml:true});
@@ -762,31 +730,22 @@ async function buildAndDownloadDocx(_questoes, _versaoLabel){
       ${gabRows}
     </w:tbl>`;
 
-    // ══════════════════════════════════════════════════
-    // WRAPPER: cabeçalho + gabarito lado a lado
-    // ══════════════════════════════════════════════════
-    // Posicionamento absoluto:
-    // cabW = 7938 twips começa em x=0 (relativo à margem)
-    // gabW = 2268 twips começa em x = 7938 + 284 (0,5cm) = 8222 twips
     const cabPos = 0;
-    const gabPos = 7938 + 284; // 8222 twips
+    const gabPos = 7938 + 284;
 
-    // Tabela cabeçalho posicionada à esquerda — nivelada pelo topo da margem
     const cabTablePos = cabTable.replace(
       '<w:tblPr>',
       `<w:tblPr><w:tblpPr w:leftFromText="0" w:rightFromText="0" w:vertAnchor="margin" w:horzAnchor="margin" w:tblpX="${cabPos}" w:tblpY="0"/>`
     );
 
-    // Tabela gabarito posicionada após o cabeçalho com gap de 0,5cm — nivelada pelo topo da margem
     const gabTablePos = gabTable.replace(
       '<w:tblPr>',
       `<w:tblPr><w:tblpPr w:leftFromText="0" w:rightFromText="0" w:vertAnchor="margin" w:horzAnchor="margin" w:tblpX="${gabPos}" w:tblpY="0"/>`
     );
 
-    // Parágrafo âncora que contém ambas as tabelas flutuantes
     const wrapTable = cabTablePos + '<w:p><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr></w:p>' + gabTablePos;
 
-    // ── QUESTÕES — resolve imagens em paralelo ──
+    // ── QUESTÕES — resolve imagens em paralelo, usando _questoes ──
     const _qImgXmls = await Promise.all(_questoes.map((q,idx) =>
       q.imagem ? imgDrawingXml(q.imagem, 9000, idx+10) : Promise.resolve('')
     ));
@@ -797,7 +756,9 @@ async function buildAndDownloadDocx(_questoes, _versaoLabel){
     });
 
     let qsXml='<w:p><w:pPr><w:spacing w:before="200" w:after="0"/></w:pPr></w:p>';
-    for(let _qi=0;_qi<_questoes.length;_qi++){ const q=_questoes[_qi]; const i=_qi; {
+    for(let _qi=0;_qi<_questoes.length;_qi++){
+      const q=_questoes[_qi];
+      const i=_qi;
       const numStr=String(i+1).padStart(2,'0');
       const pts=q.pts.toFixed(1).replace('.',',');
 
@@ -810,10 +771,10 @@ async function buildAndDownloadDocx(_questoes, _versaoLabel){
       if(q.consigna&&q.consigna.trim()) qsXml+=wPara(q.consigna,{sz:19,it:true,color:'333333',spB:40,spA:40});
       qsXml+=wPara(q.enunciado||'[sem enunciado]',{sz:21,justify:true,spB:40,spA:60});
 
-      // Imagem da questão
       if(_qImgXmls[i]) qsXml += _qImgXmls[i];
 
       if(q.tipo==='multipla'){
+        // Alternativas já na ordem embaralhada correta
         q.alternativas.forEach(a=>{ if(a.texto.trim()) qsXml+=wParaRuns([{t:a.letra+') ',bold:true,sz:20},{t:a.texto,sz:20}],{ind:360,spB:30}); });
       } else if(q.tipo==='somatoria'){
         qsXml+=wPara('Some os valores das afirmativas VERDADEIRAS.',{sz:17,it:true,color:'555555',spB:30,spA:30});
@@ -822,7 +783,7 @@ async function buildAndDownloadDocx(_questoes, _versaoLabel){
         for(let l=0;l<(q.linhas||4);l++) qsXml+=wPara('',{spB:40,borderBottom:true});
       }
       qsXml+=wParaRuns([],{spB:80,borderBottom:true});
-    }} // end for loop
+    }
 
     // ── DOCUMENT.XML ──
     const documentXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -862,7 +823,6 @@ async function buildAndDownloadDocx(_questoes, _versaoLabel){
   </w:body>
 </w:document>`;
 
-    // ── ARQUIVOS DO PACOTE DOCX ──
     const contentTypes=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
@@ -912,7 +872,6 @@ ${_qImgData.filter(Boolean).map(d => `<Relationship Id="${d.rId}" Type="http://s
   <w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat>
 </w:settings>`;
 
-    // ── MONTA O ZIP ──
     const zip=new JSZip();
     zip.file('[Content_Types].xml', contentTypes);
     zip.file('_rels/.rels', rels);
@@ -926,7 +885,6 @@ ${_qImgData.filter(Boolean).map(d => `<Relationship Id="${d.rId}" Type="http://s
       const logoPure = logoB64.split(',')[1];
       zip.file('word/media/logo.'+logoExt, logoPure, {base64:true});
     }
-    // Imagens das questões
     _qImgData.forEach(d => {
       if(d) zip.file(`word/media/${d.rId}.${d.ext}`, d.b64, {base64:true});
     });
@@ -939,6 +897,7 @@ ${_qImgData.filter(Boolean).map(d => `<Relationship Id="${d.rId}" Type="http://s
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
 }
+
 // ══════════════════════════════════════════════════════════════
 // EMBARALHAR PROVA — ANTI-COLA
 // ══════════════════════════════════════════════════════════════
@@ -962,103 +921,66 @@ function shuffleArray(arr){
   return a;
 }
 
-function buildShuffledHTML(versaoNum, totalVersoes){
-  const doShuffleQ  = document.getElementById('shuffleQuestoes').checked;
-  const doShuffleA  = document.getElementById('shuffleAlternativas').checked;
-  const VERSAO_LABELS = ['A','B','C','D'];
-  const versaoLabel  = VERSAO_LABELS[versaoNum] || String(versaoNum + 1);
+// ── Gera array de questões embaralhadas para uma versão ──
+// Retorna deep clone com questões e/ou alternativas na nova ordem,
+// garantindo que q.alternativas[i].correta aponta para a letra certa
+// após o embaralhamento.
+function buildShuffledQuestoes(){
+  const doShuffleQ = document.getElementById('shuffleQuestoes').checked;
+  const doShuffleA = document.getElementById('shuffleAlternativas').checked;
+  const letras = tipoProva === 'em' ? [...LEM] : [...LEF];
 
-  // Deep clone questões
+  // Deep clone
   let qs = JSON.parse(JSON.stringify(questoes));
 
-  // Embaralha questões
+  // Embaralha ordem das questões
   if(doShuffleQ) qs = shuffleArray(qs);
 
-  // Embaralha alternativas de múltipla escolha
+  // Embaralha alternativas mantendo a marcação de gabarito correta
   if(doShuffleA){
     qs = qs.map(q => {
       if(q.tipo !== 'multipla') return q;
-      const letras = tipoProva === 'em' ? [...LEM] : [...LEF];
-      // Shuffle só os textos, mantendo as letras A/B/C/D na ordem original
-      const textos = shuffleArray(q.alternativas.map(a => ({texto: a.texto, correta: a.correta})));
+      // Embaralha apenas os conteúdos (texto + flag correta), mantém letras A/B/C/D na ordem
+      const conteudos = shuffleArray(q.alternativas.map(a => ({texto: a.texto, correta: a.correta})));
       q.alternativas = letras.map((l, i) => ({
         letra: l,
-        texto: textos[i].texto,
-        correta: textos[i].correta
+        texto: conteudos[i].texto,
+        correta: conteudos[i].correta  // a letra que recebeu o conteúdo correto vira o novo gabarito
       }));
       return q;
     });
   }
 
-  // ── Coleta dados do cabeçalho ──
-  const escola    = document.getElementById('nomeEscola').value;
-  const cidade    = document.getElementById('cidadeEscola').value;
-  const titulo    = document.getElementById('tituloAval').value;
-  const prof      = document.getElementById('selProf').value;
-  const disc      = document.getElementById('selDisc').value;
-  const serie     = document.getElementById('selSerie').value;
-  const turma     = document.getElementById('selTurma').value;
-  const trim      = document.getElementById('selTrim').value;
-  const instrucoes= document.getElementById('instrucoes').value;
-  const dataStr   = document.getElementById('calBtn').textContent.trim();
-  const letras    = tipoProva === 'em' ? [...LEM] : [...LEF];
+  return qs;
+}
 
-  // ── Gabarito ──
-  let gabHtml = `<table style="width:152px;border-collapse:collapse;border:1.5px solid #333;font-family:Arial,sans-serif;font-size:8.5pt;float:right;margin-left:8px;">
-    <tr style="background:#e8e8e8;"><th style="border:1px solid #333;padding:3px 5px;text-align:center;">Nº</th>
-    <th style="border:1px solid #333;padding:3px 5px;text-align:center;" colspan="${letras.length+1}">Gabarito</th></tr>`;
-  qs.forEach((q, i) => {
-    const correta = q.tipo === 'multipla' ? q.alternativas.find(a => a.correta) : null;
-    gabHtml += `<tr style="background:${i%2===0?'#f9f9f9':'#fff'}"><td style="border:1px solid #333;padding:2px 5px;text-align:center;font-weight:bold;">${i+1}</td>`;
-    if(q.tipo === 'discursiva') gabHtml += `<td style="border:1px solid #333;padding:2px 4px;text-align:center;font-size:7.5pt;" colspan="${letras.length+1}">Discursiva</td>`;
-    else if(q.tipo === 'somatoria'){const soma=q.somatoria.filter(s=>s.ok).reduce((a,s)=>a+s.v,0); gabHtml+=`<td style="border:1px solid #333;padding:2px 4px;text-align:center;font-size:7.5pt;" colspan="${letras.length+1}">= ${soma||'—'}</td>`;}
-    else{ letras.forEach((l,idx)=>{ const isOk=correta&&correta.letra===l; gabHtml+=`<td style="border:1px solid #333;padding:2px 4px;text-align:center;background:${idx%2===0?'#f5f5f5':'#fff'};${isOk?'font-weight:bold;color:#166534;background:#dcfce7;':''}">${l}</td>`;}); gabHtml+=`<td style="border:1px solid #333;padding:2px 3px;width:14px;background:#f0f0f0;"></td>`;}
-    gabHtml += `</tr>`;
-  });
-  gabHtml += `</table>`;
+function gerarVersoesEmbaralhadas(){
+  const doShuffleQ = document.getElementById('shuffleQuestoes').checked;
+  const doShuffleA = document.getElementById('shuffleAlternativas').checked;
+  if(!doShuffleQ && !doShuffleA){ alert('Selecione ao menos uma opção de embaralhamento.'); return; }
+  const enunciadosVazios = questoes.filter(q => !q.enunciado || !q.enunciado.trim());
+  if(enunciadosVazios.length > 0){
+    if(!confirm(`⚠ ${enunciadosVazios.length} questão(ões) sem enunciado. Deseja continuar mesmo assim?`)) return;
+  }
+  closeShuffleModal();
 
-  // ── Cabeçalho ──
-  const logoHtml = logoB64
-    ? `<img src="${logoB64}" style="max-width:85px;max-height:65px;object-fit:contain;">`
-    : `<div style="width:85px;height:65px;border:1px dashed #ccc;display:flex;align-items:center;justify-content:center;font-size:8px;color:#aaa;">Logo</div>`;
+  const VERSAO_LABELS = ['A','B','C','D'];
+  for(let v = 0; v < numVersoes; v++){
+    const label = VERSAO_LABELS[v] || String(v+1);
+    const qs = buildShuffledQuestoes();
+    // buildHTML agora recebe _questoes e _versaoLabel — gabarito e questões ficam sincronizados
+    const html = buildHTMLCompleto(qs, label);
+    const blob = new Blob([html], {type: 'text/html'});
+    const url  = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+}
 
-  const tituloVersao = `${titulo} — VERSÃO ${versaoLabel}`;
-  const wrap = `<div style="overflow:hidden;font-family:Arial,sans-serif;margin-bottom:14px;">${gabHtml}
-    <table style="border-collapse:collapse;border:1.5px solid #333;font-family:Arial,sans-serif;font-size:9pt;width:calc(100% - 160px);">
-      <tr><td rowspan="5" style="border:1px solid #333;width:95px;text-align:center;vertical-align:middle;padding:5px;">${logoHtml}</td>
-          <td colspan="3" style="border:1px solid #333;text-align:center;vertical-align:middle;padding:4px 6px;">
-            <div style="font-size:12.5pt;font-weight:bold;">${escola}</div>
-            <div style="font-size:9.5pt;">${cidade}</div>
-            <div style="font-size:11.5pt;font-weight:bold;">${tituloVersao}</div>
-          </td>
-          <td rowspan="5" style="border:1px solid #333;width:20px;text-align:center;vertical-align:middle;font-size:9pt;font-weight:bold;writing-mode:vertical-rl;padding:4px;">N&nbsp;O&nbsp;T&nbsp;A</td>
-          <td rowspan="5" style="border:1px solid #333;width:72px;"></td></tr>
-      <tr><td colspan="2" style="border:1px solid #333;padding:3px 6px;font-size:8.5pt;">Professor(a): <u>${prof||'______________________________'}</u></td>
-          <td style="border:1px solid #333;padding:3px 6px;font-size:8.5pt;">Disciplina: <u>${disc||'_______________'}</u></td></tr>
-      <tr><td colspan="3" style="border:1px solid #333;padding:3px 6px;font-size:8.5pt;">Aluno(a): _____________________________ Série: <u>${serie}</u> Turma: <u>${turma||'___'}</u> Trimestre: <u>${trim}</u> Data: <u>${dataStr==='Selecionar data…'?'___/___/____':dataStr}</u></td></tr>
-      <tr><td colspan="3" style="border:1px solid #333;padding:3px 6px;font-size:8.5pt;">Assinatura do responsável: __________________________ Data: ___/___/___</td></tr>
-      <tr><td colspan="3" style="border:1px solid #333;padding:4px 6px;font-size:8.5pt;">${instrucoes}</td></tr>
-    </table></div>`;
-
-  // ── Questões ──
-  let qsHtml = '';
-  qs.forEach((q, i) => {
-    const numStr = String(i+1).padStart(2,'0'), pts = q.pts.toFixed(1).replace('.',',');
-    qsHtml += `<div style="margin-bottom:20px;font-family:Arial,sans-serif;font-size:11pt;page-break-inside:avoid;">
-      <div style="font-weight:bold;font-size:11.5pt;margin-bottom:6px;">QUESTÃO ${numStr} <span style="font-size:10pt;font-weight:normal;">(${pts} pts)</span></div>`;
-    if(q.distrator&&q.distrator.trim()) qsHtml+=`<div style="border-left:3px solid #bbb;padding:5px 12px;margin-bottom:8px;font-style:italic;font-size:10.5pt;background:#fafafa;">${q.distrator.replace(/\n/g,'<br>')}</div>`;
-    if(q.imagem) qsHtml+=`<div style="margin-bottom:8px;text-align:center;"><img src="${q.imagem}" style="max-width:100%;max-height:200px;border:1px solid #ddd;"></div>`;
-    if(q.consigna&&q.consigna.trim()) qsHtml+=`<div style="font-style:italic;margin-bottom:5px;font-size:10.5pt;color:#333;">${q.consigna}</div>`;
-    qsHtml+=`<div style="margin-bottom:9px;text-align:justify;line-height:1.5;">${q.enunciado||'<em style="color:#999">[sem enunciado]</em>'}</div>`;
-    if(q.tipo==='multipla') q.alternativas.forEach(a=>{if(a.texto.trim()) qsHtml+=`<div style="margin:4px 0 4px 18px;line-height:1.5;">${a.letra}) ${a.texto}</div>`;});
-    else if(q.tipo==='somatoria'){qsHtml+=`<div style="font-size:10pt;color:#555;margin-bottom:6px;font-style:italic;">Some os valores das afirmativas VERDADEIRAS.</div>`; q.somatoria.forEach(s=>{if(s.txt.trim()) qsHtml+=`<div style="margin:4px 0 4px 18px;line-height:1.5;"><strong>(${String(s.v).padStart(2,'0')})</strong> ${s.txt}</div>`;});}
-    else{for(let l=0;l<(q.linhas||4);l++) qsHtml+=`<div style="border-bottom:1px solid #aaa;height:28px;margin-bottom:4px;"></div>`;}
-    qsHtml+=`<div style="border-bottom:1px dashed #ddd;margin-top:12px;"></div></div>`;
-  });
-
-  // ── Gabarito no rodapé (para o professor) ──
-  const gabRodape = buildGabaritoRodape(qs, versaoLabel, letras);
-
+// ── Gera HTML completo (com doctype, head, print) para versões embaralhadas ──
+function buildHTMLCompleto(qs, versaoLabel){
+  const gabRodape = buildGabaritoRodape(qs, versaoLabel);
+  const corpo = buildHTML(qs, versaoLabel);
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
     <title>Prova — Versão ${versaoLabel}</title>
     <style>
@@ -1072,15 +994,17 @@ function buildShuffledHTML(versaoNum, totalVersoes){
       .gab-table .ok{background:#dcfce7;font-weight:bold;color:#166534;}
     </style>
     </head><body>
-    ${wrap}${qsHtml}
+    ${corpo}
     ${gabRodape}
     <script>window.onload=function(){window.print();}<\/script>
     </body></html>`;
 }
 
-function buildGabaritoRodape(qs, versaoLabel, letras){
+function buildGabaritoRodape(qs, versaoLabel){
+  const letras = tipoProva === 'em' ? [...LEM] : [...LEF];
   let rows = '';
   qs.forEach((q, i) => {
+    // Para múltipla escolha: busca qual letra ficou com correta=true após embaralhamento
     const correta = q.tipo === 'multipla' ? q.alternativas.find(a => a.correta) : null;
     let resposta = '—';
     if(q.tipo === 'discursiva') resposta = 'Discursiva';
@@ -1092,26 +1016,6 @@ function buildGabaritoRodape(qs, versaoLabel, letras){
     <h3>🗝 Gabarito — Versão ${versaoLabel} (uso exclusivo do professor)</h3>
     <table class="gab-table"><tr><th>Questão</th><th>Resposta</th></tr>${rows}</table>
   </div>`;
-}
-
-function gerarVersoesEmbaralhadas(){
-  const doShuffleQ = document.getElementById('shuffleQuestoes').checked;
-  const doShuffleA = document.getElementById('shuffleAlternativas').checked;
-  if(!doShuffleQ && !doShuffleA){ alert('Selecione ao menos uma opção de embaralhamento.'); return; }
-
-  const enunciadosVazios = questoes.filter(q => !q.enunciado || !q.enunciado.trim());
-  if(enunciadosVazios.length > 0){
-    if(!confirm(`⚠ ${enunciadosVazios.length} questão(ões) sem enunciado. Deseja continuar mesmo assim?`)) return;
-  }
-
-  closeShuffleModal();
-  for(let v = 0; v < numVersoes; v++){
-    const html = buildShuffledHTML(v, numVersoes);
-    const blob = new Blob([html], {type: 'text/html'});
-    const url  = URL.createObjectURL(blob);
-    const win  = window.open(url, '_blank');
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
-  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1154,26 +1058,22 @@ function carregarAvaliacao(inp){
   r.onload = e => {
     try{
       const st = JSON.parse(e.target.result);
-      // Restaura listas
       professors = st.professors||[];
       disciplinas = st.disciplinas||[];
       renderProfList(); renderProfSelect();
       renderDiscList(); renderDiscSelect();
-      // Restaura campos
       document.getElementById('nomeEscola').value  = st.escola||'';
       document.getElementById('cidadeEscola').value= st.cidade||'';
       document.getElementById('tituloAval').value  = st.titulo||'';
       document.getElementById('selTurma').value    = st.turma||'';
       document.getElementById('instrucoes').value  = st.instrucoes||'';
       if(st.ptsDefault) document.getElementById('ptsDefault').value = st.ptsDefault;
-      // Selects
       setTimeout(()=>{
         if(st.prof)  document.getElementById('selProf').value  = st.prof;
         if(st.disc)  document.getElementById('selDisc').value  = st.disc;
         if(st.serie) document.getElementById('selSerie').value = st.serie;
         if(st.trim)  document.getElementById('selTrim').value  = st.trim;
       },50);
-      // Data
       if(st.selectedDate){
         selectedDate = new Date(st.selectedDate);
         calYear = selectedDate.getFullYear(); calMonth = selectedDate.getMonth();
@@ -1182,16 +1082,13 @@ function carregarAvaliacao(inp){
         document.getElementById('calBtn').textContent =
           d.getDate().toString().padStart(2,'0')+'/'+(d.getMonth()+1).toString().padStart(2,'0')+'/'+d.getFullYear();
       }
-      // Tipo de prova
       tipoProva = st.tipoProva||'efaf';
       document.querySelectorAll('.tipo-tg button').forEach(b=>{
         b.classList.toggle('active', b.dataset.tipo===tipoProva);
       });
-      // Questões
       qId = st.qId||0;
       questoes = st.questoes||[];
       renderAll(); updatePts();
-      // Logo
       logoB64 = st.logoB64||null;
       const img = document.getElementById('logoImg');
       if(logoB64){ img.src=logoB64; img.style.display='block'; document.getElementById('logoHint').style.display='none'; }
@@ -1202,13 +1099,11 @@ function carregarAvaliacao(inp){
     }
   };
   r.readAsText(inp.files[0]);
-  inp.value=''; // reset so same file can be loaded again
+  inp.value='';
 }
 
 // ══════════════════════════════════════════════════════════════
 // HELPER: gera w:drawing para imagem de questão no DOCX
-// imgB64: data URL, maxWtwips: largura max em twips
-// Retorna Promise<string> com XML
 // ══════════════════════════════════════════════════════════════
 function imgDrawingXml(imgB64, maxWtwips, rId){
   return new Promise(resolve => {
@@ -1216,7 +1111,7 @@ function imgDrawingXml(imgB64, maxWtwips, rId){
     const img = new Image();
     img.onload = () => {
       const maxWemu = maxWtwips * 635;
-      const maxHemu = 5000 * 635; // altura max 8,8cm
+      const maxHemu = 5000 * 635;
       const ratio = img.naturalWidth / img.naturalHeight;
       let emuW = maxWemu;
       let emuH = Math.round(emuW / ratio);
@@ -1259,24 +1154,14 @@ async function gerarVersoesDocx(){
   closeShuffleModal();
 
   const VERSAO_LABELS = ['A','B','C','D'];
-  const escola = document.getElementById('nomeEscola').value;
 
   try{
     for(let v = 0; v < numVersoes; v++){
       const label = VERSAO_LABELS[v]||String(v+1);
-      // Gera questões embaralhadas para esta versão
-      let qs = JSON.parse(JSON.stringify(questoes));
-      if(doShuffleQ) qs = shuffleArray(qs);
-      if(doShuffleA){
-        const letras = tipoProva==='em' ? [...LEM] : [...LEF];
-        qs = qs.map(q => {
-          if(q.tipo !== 'multipla') return q;
-          const textos = shuffleArray(q.alternativas.map(a => ({texto:a.texto,correta:a.correta})));
-          q.alternativas = letras.map((l,i)=>({letra:l,texto:textos[i].texto,correta:textos[i].correta}));
-          return q;
-        });
-      }
-      await exportDocxFromQuestoes(qs, label);
+      // Usa buildShuffledQuestoes para gerar questões embaralhadas desta versão
+      const qs = buildShuffledQuestoes();
+      // buildAndDownloadDocx receberá o array já embaralhado — gabarito e questões sincronizados
+      await buildAndDownloadDocx(qs, label);
     }
   }finally{
     btn.disabled=false; btn.textContent='📝 Exportar Versões DOCX';
