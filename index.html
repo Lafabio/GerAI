@@ -132,6 +132,8 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tx)
   <div class="tb-acts">
     <button class="tbtn" onclick="openPreview()">👁 Pré-visualizar</button>
     <button class="tbtn" id="btnShuffle" onclick="openShuffleModal()" title="Gerar versões embaralhadas para evitar cola">🔀 Embaralhar Prova</button>
+    <button class="tbtn" onclick="salvarAvaliacao()" title="Salvar avaliação em arquivo .gprova para editar depois">💾 Salvar</button>
+    <button class="tbtn" onclick="document.getElementById('inputCarregar').click()" title="Carregar avaliação salva">📂 Carregar<input type="file" id="inputCarregar" accept=".gprova" style="display:none" onchange="carregarAvaliacao(this)"></button>
     <button class="tbtn prime" id="btnExport" onclick="exportPDF()">📄 Exportar PDF</button>
     <button class="tbtn prime" id="btnDocx" onclick="exportDOCX()">📝 Exportar DOCX</button>
     <button class="tbtn" onclick="window.print()">🖨️ Imprimir</button>
@@ -269,9 +271,12 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tx)
         </div>
       </div>
       <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:7px;padding:10px 13px;font-size:11.5px;color:#1e40af;margin-bottom:16px;">
-        ℹ️ Cada versão será aberta em uma nova aba para impressão/exportação. O gabarito de cada versão aparece no rodapé.
+        ℹ️ <strong>HTML:</strong> Cada versão abre em nova aba para impressão. <strong>DOCX:</strong> Baixa um arquivo .docx por versão com gabarito incluso.
       </div>
-      <button onclick="gerarVersoesEmbaralhadas()" style="width:100%;background:var(--ac);color:#fff;border:none;font-family:'IBM Plex Sans',sans-serif;font-size:13px;font-weight:700;padding:11px;border-radius:7px;cursor:pointer;">🔀 Gerar Versões Embaralhadas</button>
+      <div style="display:flex;gap:8px;">
+        <button onclick="gerarVersoesEmbaralhadas()" style="flex:1;background:var(--ac);color:#fff;border:none;font-family:'IBM Plex Sans',sans-serif;font-size:13px;font-weight:700;padding:11px;border-radius:7px;cursor:pointer;">🔀 Gerar Versões (HTML)</button>
+        <button onclick="gerarVersoesDocx()" style="flex:1;background:#166534;color:#fff;border:none;font-family:'IBM Plex Sans',sans-serif;font-size:13px;font-weight:700;padding:11px;border-radius:7px;cursor:pointer;" id="btnShuffleDocx">📝 Exportar Versões DOCX</button>
+      </div>
     </div>
   </div>
 </div>
@@ -466,6 +471,20 @@ async function exportDOCX(){
   const btn=document.getElementById('btnDocx');
   btn.disabled=true; btn.textContent='⏳ Gerando DOCX…';
   try{
+    await buildAndDownloadDocx(questoes, null);
+  }catch(err){
+    console.error('Erro ao gerar DOCX:',err);
+    alert('Erro ao gerar DOCX:\n'+err.message);
+  }finally{
+    btn.disabled=false; btn.textContent='📝 Exportar DOCX';
+  }
+}
+
+async function exportDocxFromQuestoes(qs, versaoLabel){
+  await buildAndDownloadDocx(qs, versaoLabel);
+}
+
+async function buildAndDownloadDocx(_questoes, _versaoLabel){
     if(typeof JSZip==='undefined') throw new Error('JSZip não carregado. Verifique sua conexão.');
 
     const escola=document.getElementById('nomeEscola').value||'';
@@ -640,7 +659,7 @@ async function exportDOCX(){
       tc(cCentro,[
         wPara(escola, {bold:true, sz:32, center:true, spA:20}),
         wPara(cidade, {sz:18, center:true, spA:20}),
-        wPara(titulo, {bold:true, sz:26, center:true}),
+        wPara(titulo + (_versaoLabel ? '  —  VERSÃO '+_versaoLabel : ''), {bold:true, sz:26, center:true}),
       ], {va:'center', sml:true}) +
       tc(cNlbl,  notaVert(), {vmStart:true, va:'center', sml:true}) +
       tc(cNbox,  wPara(''), {vmStart:true, va:'center', sml:true});
@@ -767,9 +786,18 @@ async function exportDOCX(){
     // Parágrafo âncora que contém ambas as tabelas flutuantes
     const wrapTable = cabTablePos + '<w:p><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr></w:p>' + gabTablePos;
 
-    // ── QUESTÕES ──
+    // ── QUESTÕES — resolve imagens em paralelo ──
+    const _qImgXmls = await Promise.all(_questoes.map((q,idx) =>
+      q.imagem ? imgDrawingXml(q.imagem, 9000, idx+10) : Promise.resolve('')
+    ));
+    const _qImgData = _questoes.map((q,idx) => {
+      if(!q.imagem) return null;
+      const ext = (q.imagem.match(/^data:image\/([^;]+);/)?.[1]||'png').replace('jpeg','jpg');
+      return { b64: q.imagem.split(',')[1], ext, rId: 'rIdImg'+(idx+10) };
+    });
+
     let qsXml='<w:p><w:pPr><w:spacing w:before="200" w:after="0"/></w:pPr></w:p>';
-    questoes.forEach((q,i)=>{
+    for(let _qi=0;_qi<_questoes.length;_qi++){ const q=_questoes[_qi]; const i=_qi; {
       const numStr=String(i+1).padStart(2,'0');
       const pts=q.pts.toFixed(1).replace('.',',');
 
@@ -782,6 +810,9 @@ async function exportDOCX(){
       if(q.consigna&&q.consigna.trim()) qsXml+=wPara(q.consigna,{sz:19,it:true,color:'333333',spB:40,spA:40});
       qsXml+=wPara(q.enunciado||'[sem enunciado]',{sz:21,justify:true,spB:40,spA:60});
 
+      // Imagem da questão
+      if(_qImgXmls[i]) qsXml += _qImgXmls[i];
+
       if(q.tipo==='multipla'){
         q.alternativas.forEach(a=>{ if(a.texto.trim()) qsXml+=wParaRuns([{t:a.letra+') ',bold:true,sz:20},{t:a.texto,sz:20}],{ind:360,spB:30}); });
       } else if(q.tipo==='somatoria'){
@@ -791,7 +822,7 @@ async function exportDOCX(){
         for(let l=0;l<(q.linhas||4);l++) qsXml+=wPara('',{spB:40,borderBottom:true});
       }
       qsXml+=wParaRuns([],{spB:80,borderBottom:true});
-    });
+    }} // end for loop
 
     // ── DOCUMENT.XML ──
     const documentXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -858,6 +889,7 @@ async function exportDOCX(){
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
   <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>
 ${logoB64 ? '<Relationship Id="rIdLogo" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/logo.' + logoExt + '"/>' : ''}
+${_qImgData.filter(Boolean).map(d => `<Relationship Id="${d.rId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${d.rId}.${d.ext}"/>`).join('\n')}
 </Relationships>`;
 
     const stylesXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -894,20 +926,18 @@ ${logoB64 ? '<Relationship Id="rIdLogo" Type="http://schemas.openxmlformats.org/
       const logoPure = logoB64.split(',')[1];
       zip.file('word/media/logo.'+logoExt, logoPure, {base64:true});
     }
+    // Imagens das questões
+    _qImgData.forEach(d => {
+      if(d) zip.file(`word/media/${d.rId}.${d.ext}`, d.b64, {base64:true});
+    });
 
     const blob=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',compression:'DEFLATE',compressionOptions:{level:6}});
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
-    a.href=url; a.download=`${(escola.replace(/\s+/g,'_')||'prova')}.docx`;
+    const nomearq = (escola.replace(/\s+/g,'_')||'prova') + (_versaoLabel ? '_versao'+_versaoLabel : '');
+    a.href=url; a.download=`${nomearq}.docx`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
-
-  }catch(err){
-    console.error('Erro ao gerar DOCX:',err);
-    alert('Erro ao gerar DOCX:\n'+err.message);
-  }finally{
-    btn.disabled=false; btn.textContent='📝 Exportar DOCX';
-  }
 }
 // ══════════════════════════════════════════════════════════════
 // EMBARALHAR PROVA — ANTI-COLA
@@ -1080,8 +1110,176 @@ function gerarVersoesEmbaralhadas(){
     const blob = new Blob([html], {type: 'text/html'});
     const url  = URL.createObjectURL(blob);
     const win  = window.open(url, '_blank');
-    // Limpa URL após abrir
     setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// SALVAR / CARREGAR AVALIAÇÃO
+// ══════════════════════════════════════════════════════════════
+function salvarAvaliacao(){
+  const estado = {
+    versao: 2,
+    escola:    document.getElementById('nomeEscola').value,
+    cidade:    document.getElementById('cidadeEscola').value,
+    titulo:    document.getElementById('tituloAval').value,
+    prof:      document.getElementById('selProf').value,
+    disc:      document.getElementById('selDisc').value,
+    serie:     document.getElementById('selSerie').value,
+    turma:     document.getElementById('selTurma').value,
+    trim:      document.getElementById('selTrim').value,
+    instrucoes:document.getElementById('instrucoes').value,
+    ptsDefault:document.getElementById('ptsDefault').value,
+    tipoProva,
+    selectedDate,
+    professors,
+    disciplinas,
+    qId,
+    questoes,
+    logoB64
+  };
+  const json = JSON.stringify(estado);
+  const blob = new Blob([json], {type:'application/json'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const nome = (document.getElementById('tituloAval').value||'avaliacao').replace(/\s+/g,'_').replace(/[^\w\-]/g,'');
+  a.href = url; a.download = nome+'.gprova';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function carregarAvaliacao(inp){
+  if(!inp.files[0]) return;
+  const r = new FileReader();
+  r.onload = e => {
+    try{
+      const st = JSON.parse(e.target.result);
+      // Restaura listas
+      professors = st.professors||[];
+      disciplinas = st.disciplinas||[];
+      renderProfList(); renderProfSelect();
+      renderDiscList(); renderDiscSelect();
+      // Restaura campos
+      document.getElementById('nomeEscola').value  = st.escola||'';
+      document.getElementById('cidadeEscola').value= st.cidade||'';
+      document.getElementById('tituloAval').value  = st.titulo||'';
+      document.getElementById('selTurma').value    = st.turma||'';
+      document.getElementById('instrucoes').value  = st.instrucoes||'';
+      if(st.ptsDefault) document.getElementById('ptsDefault').value = st.ptsDefault;
+      // Selects
+      setTimeout(()=>{
+        if(st.prof)  document.getElementById('selProf').value  = st.prof;
+        if(st.disc)  document.getElementById('selDisc').value  = st.disc;
+        if(st.serie) document.getElementById('selSerie').value = st.serie;
+        if(st.trim)  document.getElementById('selTrim').value  = st.trim;
+      },50);
+      // Data
+      if(st.selectedDate){
+        selectedDate = new Date(st.selectedDate);
+        calYear = selectedDate.getFullYear(); calMonth = selectedDate.getMonth();
+        renderCal();
+        const d = selectedDate;
+        document.getElementById('calBtn').textContent =
+          d.getDate().toString().padStart(2,'0')+'/'+(d.getMonth()+1).toString().padStart(2,'0')+'/'+d.getFullYear();
+      }
+      // Tipo de prova
+      tipoProva = st.tipoProva||'efaf';
+      document.querySelectorAll('.tipo-tg button').forEach(b=>{
+        b.classList.toggle('active', b.dataset.tipo===tipoProva);
+      });
+      // Questões
+      qId = st.qId||0;
+      questoes = st.questoes||[];
+      renderAll(); updatePts();
+      // Logo
+      logoB64 = st.logoB64||null;
+      const img = document.getElementById('logoImg');
+      if(logoB64){ img.src=logoB64; img.style.display='block'; document.getElementById('logoHint').style.display='none'; }
+      else { img.style.display='none'; document.getElementById('logoHint').style.display=''; }
+      alert('✅ Avaliação carregada com sucesso!');
+    }catch(err){
+      alert('❌ Arquivo inválido ou corrompido.\n'+err.message);
+    }
+  };
+  r.readAsText(inp.files[0]);
+  inp.value=''; // reset so same file can be loaded again
+}
+
+// ══════════════════════════════════════════════════════════════
+// HELPER: gera w:drawing para imagem de questão no DOCX
+// imgB64: data URL, maxWtwips: largura max em twips
+// Retorna Promise<string> com XML
+// ══════════════════════════════════════════════════════════════
+function imgDrawingXml(imgB64, maxWtwips, rId){
+  return new Promise(resolve => {
+    if(!imgB64){ resolve(''); return; }
+    const img = new Image();
+    img.onload = () => {
+      const maxWemu = maxWtwips * 635;
+      const maxHemu = 5000 * 635; // altura max 8,8cm
+      const ratio = img.naturalWidth / img.naturalHeight;
+      let emuW = maxWemu;
+      let emuH = Math.round(emuW / ratio);
+      if(emuH > maxHemu){ emuH = maxHemu; emuW = Math.round(emuH * ratio); }
+      resolve(
+        `<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="60" w:after="60"/></w:pPr>` +
+        `<w:r><w:rPr><w:noProof/></w:rPr><w:drawing>` +
+        `<wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">` +
+        `<wp:extent cx="${emuW}" cy="${emuH}"/>` +
+        `<wp:effectExtent l="0" t="0" r="0" b="0"/>` +
+        `<wp:docPr id="${rId}" name="img${rId}"/>` +
+        `<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">` +
+        `<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">` +
+        `<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">` +
+        `<pic:nvPicPr><pic:cNvPr id="${rId}" name="img${rId}"/><pic:cNvPicPr><a:picLocks noChangeAspect="1"/></pic:cNvPicPr></pic:nvPicPr>` +
+        `<pic:blipFill><a:blip r:embed="rIdImg${rId}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>` +
+        `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${emuW}" cy="${emuH}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>` +
+        `</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`
+      );
+    };
+    img.onerror = () => resolve('');
+    img.src = imgB64;
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// EXPORTAR VERSÕES EMBARALHADAS EM DOCX
+// ══════════════════════════════════════════════════════════════
+async function gerarVersoesDocx(){
+  const doShuffleQ = document.getElementById('shuffleQuestoes').checked;
+  const doShuffleA = document.getElementById('shuffleAlternativas').checked;
+  if(!doShuffleQ && !doShuffleA){ alert('Selecione ao menos uma opção de embaralhamento.'); return; }
+  const enunciadosVazios = questoes.filter(q => !q.enunciado || !q.enunciado.trim());
+  if(enunciadosVazios.length > 0){
+    if(!confirm(`⚠ ${enunciadosVazios.length} questão(ões) sem enunciado. Deseja continuar mesmo assim?`)) return;
+  }
+
+  const btn = document.getElementById('btnShuffleDocx');
+  btn.disabled = true; btn.textContent = '⏳ Gerando…';
+  closeShuffleModal();
+
+  const VERSAO_LABELS = ['A','B','C','D'];
+  const escola = document.getElementById('nomeEscola').value;
+
+  try{
+    for(let v = 0; v < numVersoes; v++){
+      const label = VERSAO_LABELS[v]||String(v+1);
+      // Gera questões embaralhadas para esta versão
+      let qs = JSON.parse(JSON.stringify(questoes));
+      if(doShuffleQ) qs = shuffleArray(qs);
+      if(doShuffleA){
+        const letras = tipoProva==='em' ? [...LEM] : [...LEF];
+        qs = qs.map(q => {
+          if(q.tipo !== 'multipla') return q;
+          const textos = shuffleArray(q.alternativas.map(a => ({texto:a.texto,correta:a.correta})));
+          q.alternativas = letras.map((l,i)=>({letra:l,texto:textos[i].texto,correta:textos[i].correta}));
+          return q;
+        });
+      }
+      await exportDocxFromQuestoes(qs, label);
+    }
+  }finally{
+    btn.disabled=false; btn.textContent='📝 Exportar Versões DOCX';
   }
 }
 
